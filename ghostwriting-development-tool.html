@@ -1,0 +1,1887 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>대필 시스템 프로토타입</title>
+  <style>
+    @import url("https://cdn.jsdelivr.net/gh/orioncactus/pretendard/dist/web/static/pretendard.css");
+
+    :root {
+      --ink: #211d1a;
+      --muted: #6f655d;
+      --paper: #fff9ed;
+      --paper-2: #f3e7d4;
+      --line: #d6c3aa;
+      --accent: #8f3d32;
+      --teal: #2f6f66;
+      --bad: #96343a;
+      --good: #2d6b43;
+      --shadow: 0 14px 34px rgba(45, 32, 22, .14);
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      color: var(--ink);
+      font-family: "Pretendard", "Malgun Gothic", "Apple SD Gothic Neo", system-ui, sans-serif;
+      background:
+        linear-gradient(rgba(43, 34, 25, .08) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(43, 34, 25, .06) 1px, transparent 1px),
+        #e8dccb;
+      background-size: 32px 32px;
+    }
+
+    button, input, textarea, select {
+      font: inherit;
+    }
+
+    button {
+      min-height: 40px;
+      padding: 8px 12px;
+      border: 1px solid var(--line);
+      background: var(--paper);
+      color: var(--ink);
+      cursor: pointer;
+      transition: transform .16s ease, border-color .16s ease, box-shadow .16s ease, background-color .16s ease, opacity .16s ease;
+    }
+
+    button:hover:not(:disabled), button.active {
+      border-color: var(--accent);
+      box-shadow: inset 0 0 0 1px rgba(143, 61, 50, .18);
+      transform: translateY(-1px);
+    }
+
+    button:active:not(:disabled) {
+      transform: translateY(1px) scale(.99);
+    }
+
+    button:disabled {
+      cursor: not-allowed;
+      opacity: .45;
+    }
+
+    input, textarea, select {
+      width: 100%;
+      border: 1px solid var(--line);
+      background: #fffdf8;
+      color: var(--ink);
+      padding: 9px 10px;
+    }
+
+    textarea {
+      min-height: 78px;
+      resize: vertical;
+      line-height: 1.55;
+    }
+
+    .app {
+      width: min(1240px, calc(100% - 28px));
+      margin: 0 auto;
+      padding: 24px 0 34px;
+    }
+
+    .topbar {
+      display: flex;
+      justify-content: space-between;
+      align-items: end;
+      gap: 16px;
+      margin-bottom: 16px;
+    }
+
+    .brand-head {
+      display: grid;
+      grid-template-columns: 76px minmax(0, 1fr);
+      gap: 16px;
+      align-items: center;
+    }
+
+    .brand-logo {
+      width: 76px;
+      height: 76px;
+      object-fit: contain;
+      background: transparent;
+      border: 0;
+      padding: 0;
+      filter: drop-shadow(0 4px 8px rgba(45, 32, 22, .12));
+    }
+
+    .official-notice {
+      margin: -4px 0 18px;
+      border: 1px solid #cbb79d;
+      background: rgba(255, 253, 247, .88);
+      padding: 12px 14px;
+      line-height: 1.6;
+      color: #4b4038;
+    }
+
+    .official-notice strong {
+      color: var(--accent);
+    }
+
+    .copyright-footer {
+      margin-top: 22px;
+      padding: 12px 0 0;
+      border-top: 1px solid rgba(91, 76, 62, .28);
+      color: #6f655d;
+      font-size: 13px;
+      line-height: 1.6;
+    }
+
+    h1, h2, h3, p {
+      margin: 0;
+    }
+
+    h1 {
+      font-size: 28px;
+      line-height: 1.2;
+    }
+
+    .subtitle {
+      color: var(--muted);
+      margin-top: 6px;
+      font-size: 14px;
+      line-height: 1.55;
+    }
+
+    .mode-buttons {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+      justify-content: flex-end;
+    }
+
+    .screen {
+      display: none;
+    }
+
+    .screen.active {
+      display: block;
+      animation: screenIn .28s ease both;
+    }
+
+    @keyframes screenIn {
+      from { opacity: .94; transform: translateY(4px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    .status-strip {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(120px, 1fr));
+      gap: 8px;
+      margin-bottom: 14px;
+    }
+
+    .status-item, .panel, .letter, .editor-card {
+      border: 1px solid var(--line);
+      background: rgba(255, 249, 237, .92);
+      box-shadow: var(--shadow);
+    }
+
+    .status-item {
+      padding: 9px 10px;
+    }
+
+    .status-item b {
+      display: block;
+      font-size: 12px;
+      color: var(--muted);
+      margin-bottom: 3px;
+    }
+
+    .summary-layout {
+      display: grid;
+      grid-template-columns: minmax(230px, 1fr) minmax(360px, 1.1fr) minmax(230px, 1fr);
+      gap: 18px;
+      align-items: center;
+      min-height: 620px;
+      border: 1px solid rgba(190, 166, 136, .65);
+      background:
+        radial-gradient(circle at 50% 40%, rgba(255, 255, 255, .78), transparent 34%),
+        linear-gradient(180deg, rgba(255, 250, 240, .94), rgba(236, 222, 202, .86));
+      padding: 30px;
+      box-shadow: var(--shadow);
+      overflow: hidden;
+    }
+
+    .summary-center {
+      position: relative;
+      min-height: 540px;
+      display: grid;
+      place-items: center;
+      isolation: isolate;
+    }
+
+    .summary-character {
+      width: min(280px, 78%);
+      min-height: 300px;
+      border: 0;
+      background: transparent;
+      display: grid;
+      place-items: center;
+      padding: 0;
+      cursor: not-allowed;
+      opacity: .72;
+      filter: grayscale(.12);
+    }
+
+    .summary-character img {
+      width: 100%;
+      max-height: 300px;
+      object-fit: contain;
+      filter: drop-shadow(0 16px 18px rgba(0, 0, 0, .28));
+      transition: transform .24s ease, filter .24s ease;
+    }
+
+    .summary-character.ready {
+      cursor: pointer;
+      opacity: 1;
+      filter: none;
+      animation: readyPulse 1.2s ease-in-out infinite alternate;
+    }
+
+    .summary-character.ready img {
+      filter: drop-shadow(0 0 18px rgba(255, 210, 95, .95)) drop-shadow(0 18px 18px rgba(0, 0, 0, .28));
+    }
+
+    .summary-character.ready:hover img {
+      transform: scale(1.04) rotate(-1deg);
+    }
+
+    @keyframes readyPulse {
+      from { transform: translateY(0) scale(1); }
+      to { transform: translateY(-4px) scale(1.025); }
+    }
+
+    .client-note {
+      position: absolute;
+      bottom: 32px;
+      width: min(390px, 88%);
+      background: rgba(255, 249, 237, .92);
+      border: 1px solid var(--line);
+      box-shadow: var(--shadow);
+      line-height: 1.75;
+      padding: 16px;
+      text-align: center;
+      animation: floatNote 3s ease-in-out infinite alternate;
+    }
+
+    @keyframes floatNote {
+      from { transform: translateY(0); }
+      to { transform: translateY(-5px); }
+    }
+
+    .panel-list {
+      display: grid;
+      gap: 12px;
+    }
+
+    .summary-side {
+      display: grid;
+      gap: 14px;
+      align-content: center;
+    }
+
+    .info-panel button {
+      width: 100%;
+      min-height: 70px;
+      border: 0;
+      border-bottom: 1px solid var(--line);
+      background: transparent;
+      padding: 16px;
+      text-align: left;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .info-panel {
+      transition: transform .2s ease, box-shadow .2s ease, background-color .2s ease;
+    }
+
+    .info-panel:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 18px 34px rgba(45, 32, 22, .18);
+    }
+
+    .info-panel .body {
+      display: none;
+      padding: 16px;
+      line-height: 1.7;
+      color: #3d332c;
+    }
+
+    .info-panel.open .body {
+      display: block;
+      animation: panelOpen .22s ease both;
+    }
+
+    @keyframes panelOpen {
+      from { opacity: 0; transform: translateY(-6px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      min-width: 32px;
+      height: 28px;
+      border: 1px solid var(--line);
+      background: #fff8ec;
+      color: var(--muted);
+      font-size: 12px;
+      white-space: nowrap;
+    }
+
+    .row {
+      display: flex;
+      justify-content: flex-end;
+      align-items: center;
+      gap: 8px;
+      flex-wrap: wrap;
+      margin-top: 12px;
+    }
+
+    .primary {
+      min-width: 128px;
+      background: var(--accent);
+      border-color: var(--accent);
+      color: white;
+    }
+
+    .work-layout {
+      display: grid;
+      grid-template-columns: 220px minmax(0, 1fr) 320px;
+      gap: 14px;
+      align-items: start;
+    }
+
+    .slot-list {
+      display: grid;
+      gap: 8px;
+    }
+
+    .slot-button {
+      display: grid;
+      grid-template-columns: 1fr auto;
+      text-align: left;
+      gap: 8px;
+      min-height: 58px;
+    }
+
+    .work-panel {
+      min-height: 520px;
+      padding: 18px;
+    }
+
+    .slot-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: start;
+      gap: 12px;
+      margin-bottom: 16px;
+    }
+
+    .type-label {
+      border: 1px solid var(--line);
+      background: #f7ead7;
+      padding: 6px 10px;
+      color: #5d4c40;
+      white-space: nowrap;
+      font-size: 13px;
+    }
+
+    .choice-list, .point-list, .word-options, .editor-grid {
+      display: grid;
+      gap: 10px;
+    }
+
+    .choice-wrap, .word-wrap {
+      display: grid;
+      gap: 6px;
+      position: relative;
+    }
+
+    .choice {
+      width: 100%;
+      min-height: 62px;
+      text-align: left;
+      line-height: 1.55;
+      padding: 13px;
+    }
+
+    .sentence-preview {
+      border: 1px dashed #bfa889;
+      background: #fffdf7;
+      padding: 14px;
+      min-height: 72px;
+      line-height: 1.8;
+      margin-bottom: 14px;
+    }
+
+    .point {
+      border: 1px solid var(--line);
+      background: #fffaf0;
+      padding: 13px;
+    }
+
+    .point-title {
+      display: flex;
+      justify-content: space-between;
+      gap: 10px;
+      margin-bottom: 10px;
+      color: var(--muted);
+      font-size: 13px;
+      line-height: 1.45;
+    }
+
+    .word-options {
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+    }
+
+    .reaction-bubble {
+      position: absolute;
+      top: calc(100% + 6px);
+      left: 8px;
+      z-index: 8;
+      width: fit-content;
+      max-width: min(420px, 90vw);
+      display: none;
+      background: #fff;
+      border: 1px solid #cdb89e;
+      box-shadow: 0 8px 18px rgba(45, 32, 22, .12);
+      padding: 8px 10px;
+      color: #4a4038;
+      font-size: 13px;
+      line-height: 1.45;
+      animation: bubbleIn .2s ease both;
+    }
+
+    .choice-wrap:hover .reaction-bubble,
+    .choice-wrap:focus-within .reaction-bubble,
+    .word-wrap:hover .reaction-bubble,
+    .word-wrap:focus-within .reaction-bubble {
+      display: block;
+    }
+
+    .reaction-bubble::before {
+      content: "";
+      position: absolute;
+      left: 14px;
+      top: -7px;
+      width: 12px;
+      height: 12px;
+      background: #fff;
+      border-left: 1px solid #cdb89e;
+      border-top: 1px solid #cdb89e;
+      transform: rotate(45deg);
+    }
+
+    @keyframes bubbleIn {
+      from { opacity: 0; transform: translateY(-4px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    .letter {
+      padding: 16px;
+      min-height: 420px;
+    }
+
+    .letter-body {
+      white-space: pre-line;
+      line-height: 1.8;
+      color: #3a302a;
+      min-height: 210px;
+      border-top: 1px solid var(--line);
+      border-bottom: 1px solid var(--line);
+      padding: 14px 0;
+      margin: 12px 0;
+    }
+
+    .feedback {
+      margin-top: 14px;
+      padding: 14px;
+      line-height: 1.65;
+    }
+
+    .meter {
+      height: 12px;
+      border: 1px solid var(--line);
+      background: #eadcc8;
+      overflow: hidden;
+      margin: 10px 0;
+    }
+
+    .meter span {
+      display: block;
+      height: 100%;
+      width: 0;
+      background: linear-gradient(90deg, var(--bad), #b96d1c, var(--good));
+      transition: width .25s ease;
+    }
+
+    .good { color: var(--good); font-weight: 700; }
+    .bad { color: var(--bad); font-weight: 700; }
+    .hint { color: var(--teal); font-weight: 700; }
+
+    .hint-button {
+      width: 100%;
+      margin-top: 10px;
+    }
+
+    .seal-layout {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) 320px;
+      gap: 16px;
+    }
+
+    .gallery-layout {
+      display: grid;
+      grid-template-columns: 240px minmax(0, 1fr);
+      gap: 14px;
+      align-items: start;
+    }
+
+    .gallery-tabs {
+      display: grid;
+      gap: 8px;
+    }
+
+    .gallery-tabs button {
+      text-align: left;
+    }
+
+    .gallery-content {
+      min-height: 560px;
+      padding: 18px;
+    }
+
+    .progress-line {
+      margin: 10px 0 16px;
+      color: var(--muted);
+      font-size: 14px;
+    }
+
+    .archive-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+      gap: 12px;
+    }
+
+    .archive-card {
+      border: 1px solid var(--line);
+      background: rgba(255, 253, 248, .82);
+      padding: 14px;
+      min-height: 130px;
+      line-height: 1.6;
+    }
+
+    .profile-lock {
+      color: var(--muted);
+      border-top: 1px solid var(--line);
+      padding-top: 8px;
+      margin-top: 8px;
+    }
+
+    .achievement-badge {
+      display: inline-flex;
+      margin-left: 8px;
+      padding: 4px 8px;
+      border: 1px solid #d3a43c;
+      background: #fff4bf;
+      color: #805b00;
+      font-size: 12px;
+      font-weight: 700;
+    }
+
+    .sealed-letter {
+      position: relative;
+      min-height: 560px;
+      padding: 34px;
+      border: 1px solid var(--line);
+      background: var(--paper);
+      box-shadow: var(--shadow);
+    }
+
+    .stamp-target {
+      position: absolute;
+      right: 44px;
+      bottom: 42px;
+      width: 122px;
+      height: 122px;
+      border: 2px dashed rgba(143, 61, 50, .45);
+      display: grid;
+      place-items: center;
+      color: rgba(143, 61, 50, .62);
+    }
+
+    .stamp-target.stamped {
+      border-style: solid;
+      border-color: rgba(143, 61, 50, .85);
+      background: radial-gradient(circle, rgba(143, 61, 50, .9), rgba(143, 61, 50, .74));
+      color: white;
+      transform: rotate(-8deg);
+      font-weight: 700;
+    }
+
+    .editor-layout {
+      display: grid;
+      grid-template-columns: 320px minmax(0, 1fr);
+      gap: 14px;
+      align-items: start;
+    }
+
+    .editor-card {
+      padding: 14px;
+    }
+
+    .editor-card h2, .editor-card h3 {
+      margin-bottom: 10px;
+    }
+
+    .field {
+      display: grid;
+      gap: 6px;
+      margin-bottom: 10px;
+    }
+
+    .field label {
+      color: var(--muted);
+      font-size: 13px;
+    }
+
+    .small-grid {
+      display: grid;
+      grid-template-columns: 1fr 86px;
+      gap: 8px;
+      align-items: end;
+    }
+
+    .edit-section {
+      border-top: 1px solid var(--line);
+      padding-top: 12px;
+      margin-top: 12px;
+    }
+
+    .mini-list {
+      display: grid;
+      gap: 8px;
+    }
+
+    .mini-list button {
+      text-align: left;
+    }
+
+    .save-note {
+      margin-top: 10px;
+      color: var(--teal);
+      font-weight: 700;
+      min-height: 24px;
+    }
+
+    @media (max-width: 980px) {
+      .topbar, .summary-layout, .work-layout, .seal-layout, .editor-layout, .gallery-layout {
+        display: grid;
+        grid-template-columns: 1fr;
+      }
+
+      .status-strip {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+      }
+
+      .summary-layout {
+        min-height: auto;
+        padding: 18px;
+      }
+
+      .summary-center {
+        order: -1;
+      }
+    }
+
+    @media (max-width: 620px) {
+      .app { width: min(100% - 18px, 1240px); }
+      .status-strip, .word-options { grid-template-columns: 1fr; }
+      .slot-header { display: grid; }
+      .sealed-letter { padding: 20px; }
+    }
+  </style>
+</head>
+<body>
+  <main class="app">
+    <header class="topbar">
+      <div class="brand-head">
+        <img class="brand-logo" src="sucream-logo.png" alt="Sucream 로고" />
+        <div>
+          <h1>Sucream 대필 시스템 개발도구</h1>
+        </div>
+      </div>
+      <div class="mode-buttons">
+        <button id="playModeButton" class="active">플레이 모드</button>
+        <button id="galleryModeButton">갤러리</button>
+        <button id="editModeButton">제작자 편집</button>
+      </div>
+    </header>
+    <section class="official-notice">
+      <strong>안내</strong> 이 웹페이지는 Sucream의 공식 대필 시스템 개발도구입니다. 화면 구성, 문구, 로고 및 관련 리소스의 저작권은 Sucream에 있으며, 팀 내부 기획·개발 검토 목적 외 무단 복제, 배포, 상업적 이용을 금지합니다.
+    </section>
+
+    <section id="playMode" class="screen active">
+      <div class="status-strip" aria-live="polite">
+        <div class="status-item"><b>전달 시도</b><span id="attemptText">0 / 4</span></div>
+        <div class="status-item"><b>현재 정확도</b><span id="scoreText">0%</span></div>
+        <div class="status-item"><b>판정</b><span id="gradeText">작성 전</span></div>
+        <div class="status-item"><b>신성</b><span id="faithText">-</span></div>
+      </div>
+
+      <section id="summaryScreen" class="screen active">
+        <div class="summary-layout">
+          <div class="summary-side" id="summaryLeft"></div>
+          <div class="summary-center">
+            <button id="startButton" class="summary-character" disabled aria-label="요약 확인 후 대필 시작">
+              <img id="characterImageView" src="sucream-logo-transparent.png" alt="의뢰 캐릭터" />
+            </button>
+            <div class="client-note">
+              <h2 id="clientNameView"></h2>
+              <p id="clientIntroView"></p>
+            </div>
+          </div>
+          <div class="summary-side" id="summaryRight"></div>
+        </div>
+      </section>
+
+      <section id="workScreen" class="screen">
+        <div class="work-layout">
+          <aside>
+            <div class="slot-list" id="slotList"></div>
+            <div class="panel feedback" id="hintPanel">
+              <h3>무료 힌트</h3>
+              <p>원하는 슬롯 하나에만 1회 사용할 수 있다.</p>
+            </div>
+          </aside>
+
+          <section class="panel work-panel">
+            <div class="slot-header">
+              <div>
+                <h2 id="slotTitle"></h2>
+                <p class="subtitle" id="slotDesc"></p>
+              </div>
+              <span class="type-label" id="slotType"></span>
+            </div>
+            <div id="slotEditor"></div>
+            <div class="row">
+              <button id="prevSlot">이전 슬롯</button>
+              <button id="nextSlot">다음 슬롯</button>
+            </div>
+          </section>
+
+          <aside>
+            <div class="letter">
+              <h3>현재 작업물</h3>
+              <div class="letter-body" id="letterPreview"></div>
+              <button id="deliverButton" class="primary" disabled>전달하기</button>
+            </div>
+            <div class="panel feedback" id="feedbackPanel">
+              <h3>의뢰인 피드백</h3>
+              <p>모든 슬롯을 완성하면 전달할 수 있다.</p>
+            </div>
+            <div class="panel feedback" id="galleryPanel">
+              <h3>갤러리 상태</h3>
+              <p>아직 보관된 작업물이 없다.</p>
+            </div>
+          </aside>
+        </div>
+      </section>
+
+      <section id="sealScreen" class="screen">
+        <div class="seal-layout">
+          <article class="sealed-letter">
+            <h2>편지지에 담기</h2>
+            <div class="letter-body" id="finalLetter"></div>
+            <button id="stampTarget" class="stamp-target" type="button">인장 찍기</button>
+          </article>
+          <aside class="editor-card">
+            <h2>전달 결과</h2>
+            <p id="resultLine"></p>
+            <div class="edit-section">
+              <p><b>정확도</b> <span id="resultScore"></span></p>
+              <p><b>신성</b> <span id="resultFaith"></span></p>
+              <p><b>갤러리</b> <span id="resultGallery"></span></p>
+              <p><b>반응</b> <span id="resultReaction"></span></p>
+            </div>
+            <div class="row">
+              <button id="restartButton">처음부터 다시</button>
+              <button id="saveGalleryButton" class="primary">갤러리에 저장</button>
+            </div>
+          </aside>
+        </div>
+      </section>
+
+      <section id="galleryScreen" class="screen">
+        <div class="gallery-layout">
+          <aside class="editor-card">
+            <h2>갤러리</h2>
+            <p class="subtitle">인물별 기록을 선물, 편지, CG, 인물 정보로 보관한다.</p>
+            <div class="gallery-tabs">
+              <button class="gallery-tab active" data-tab="letters">편지</button>
+              <button class="gallery-tab" data-tab="profile">인물 정보</button>
+              <button class="gallery-tab" data-tab="gifts">선물</button>
+              <button class="gallery-tab" data-tab="cg">CG</button>
+            </div>
+            <div class="row">
+              <button id="backToWorkButton">대필 화면으로</button>
+            </div>
+          </aside>
+          <section class="panel gallery-content">
+            <div id="galleryContent"></div>
+          </section>
+        </div>
+      </section>
+    </section>
+
+    <section id="editMode" class="screen">
+      <div class="editor-layout">
+        <aside class="editor-card">
+          <h2>편집 대상</h2>
+          <div class="mini-list">
+            <button class="editor-nav active" data-target="request">의뢰 기본 정보</button>
+            <button class="editor-nav" data-target="panels">요약 패널</button>
+            <button class="editor-nav" data-target="slots">대필 슬롯</button>
+            <button class="editor-nav" data-target="result">피드백 문구</button>
+          </div>
+          <div class="edit-section">
+            <button id="resetDataButton">샘플 데이터로 초기화</button>
+            <p class="subtitle">저장하면 브라우저 localStorage에 보관된다.</p>
+          </div>
+        </aside>
+
+        <section class="editor-card">
+          <div id="requestEditor" class="editor-section"></div>
+          <div id="panelsEditor" class="editor-section"></div>
+          <div id="slotsEditor" class="editor-section"></div>
+          <div id="resultEditor" class="editor-section"></div>
+          <div class="row">
+            <button id="saveDataButton" class="primary">저장하고 플레이에 반영</button>
+          </div>
+          <p id="saveNote" class="save-note"></p>
+        </section>
+      </div>
+    </section>
+
+    <footer class="copyright-footer">
+      Copyright Sucream. All rights reserved. 본 개발도구와 포함 리소스는 Sucream 내부 개발 검토용 자료입니다.
+    </footer>
+  </main>
+
+  <script>
+    const sampleData = {
+      clientName: "세아",
+      characterImage: "sucream-logo-transparent.png",
+      clientIntro: "오랫동안 왕래가 끊긴 언니에게 사과 편지를 보내고 싶다. 직접 말하면 변명처럼 들릴까 봐, 담담하지만 진심이 보이는 표현을 원한다.",
+      panels: [
+        { title: "의뢰 내용", body: "세아는 언니에게 오래전 다툼을 사과하려 한다. 목적은 용서를 강요하는 것이 아니라, 상처를 인정하고 다시 대화할 여지를 남기는 것이다." },
+        { title: "핵심 키워드", body: "진심, 책임 인정, 조심스러운 거리감, 다시 만날 가능성. 피해야 할 표현은 변명, 재촉, 과장된 감정 호소다." },
+        { title: "캐릭터 성향", body: "세아는 감정을 크게 드러내기보다 정리된 말로 마음을 전하는 인물이다. 너무 극적인 문장보다 담담한 인정이 잘 맞는다." },
+        { title: "과거 힌트", body: "언니가 상처받은 지점은 세아가 그날의 선택을 가볍게 넘겼다고 느낀 부분이다. 사건 설명보다 책임을 받아들이는 표현이 중요하다." }
+      ],
+      slots: [
+        {
+          title: "첫 인사",
+          type: "normal",
+          desc: "완성된 문장 3개 중 하나를 고른다.",
+          weight: 18,
+          choices: [
+            { text: "오랜만에 이런 편지를 보내서 놀랐을 거야.", score: 12 },
+            { text: "갑자기 연락해서 미안해. 그래도 더 늦기 전에 내 마음을 전하고 싶었어.", score: 18 },
+            { text: "이제는 네가 내 말을 들어줘야 한다고 생각해.", score: 2 }
+          ],
+          selected: null
+        },
+        {
+          title: "본심 번역",
+          type: "core",
+          desc: "문장 안의 교체 포인트마다 단어를 고른다.",
+          weight: 38,
+          template: "그날 나는 [fault]했고, 네가 [pain]을 느꼈다는 걸 이제는 [attitude].",
+          points: [
+            {
+              key: "fault",
+              label: "책임 표현",
+              hint: "상대의 상처를 만든 행동을 가볍게 넘기지 않는 단어가 필요하다.",
+              options: [
+                { text: "상황을 설명하려", score: 5 },
+                { text: "내 선택을 정당화", score: 10 },
+                { text: "내 잘못을 피하려", score: 38 }
+              ],
+              selected: null
+            },
+            {
+              key: "pain",
+              label: "상대 감정",
+              hint: "상대가 받은 감정을 구체적으로 인정할수록 좋다.",
+              options: [
+                { text: "괜한 오해", score: 4 },
+                { text: "서운함", score: 22 },
+                { text: "외면당한 아픔", score: 38 }
+              ],
+              selected: null
+            },
+            {
+              key: "attitude",
+              label: "현재 태도",
+              hint: "용서를 요구하지 않고 받아들이는 태도가 세아에게 맞다.",
+              options: [
+                { text: "이해해 줬으면 해", score: 9 },
+                { text: "조금은 알 것 같아", score: 24 },
+                { text: "늦게나마 받아들이고 있어", score: 38 }
+              ],
+              selected: null
+            }
+          ]
+        },
+        {
+          title: "앞으로의 거리",
+          type: "normal",
+          desc: "관계 회복을 재촉하지 않는 표현을 선택한다.",
+          weight: 20,
+          choices: [
+            { text: "네가 원한다면 언젠가 천천히 다시 이야기하고 싶어.", score: 20 },
+            { text: "나는 이제 충분히 사과했으니 네 답을 기다릴게.", score: 6 },
+            { text: "우리가 예전처럼 돌아갈 수 있다고 믿어.", score: 12 }
+          ],
+          selected: null
+        },
+        {
+          title: "마무리",
+          type: "normal",
+          desc: "마지막 인상은 편지 전체의 분위기를 결정한다.",
+          weight: 24,
+          choices: [
+            { text: "답장을 바라기보다, 이 말이 너에게 무겁지 않게 닿았으면 해.", score: 24 },
+            { text: "나는 아직도 우리 사이가 끝났다고 생각하지 않아.", score: 12 },
+            { text: "이번에는 네가 먼저 마음을 열어줬으면 좋겠어.", score: 5 }
+          ],
+          selected: null
+        }
+      ],
+      feedback: {
+        perfect: "한참 편지를 읽고 고개를 끄덕인다. 책임을 인정하되 답을 강요하지 않는 분위기가 가장 잘 맞았다.",
+        adequate: "전체 분위기는 맞다. 일부 표현은 더 담담하게 낮추면 좋다. 원하면 다시 쓸 수 있다.",
+        weak: "편지를 내려놓고 수정을 요청한다. 사과보다 설명이 앞서 보인다.",
+        poor: "이 편지를 보내기 어렵다고 말한다. 상대에게 답을 요구하거나 책임을 흐리는 인상이 강하다.",
+        hint: "핵심 슬롯은 용서 요구보다 결과를 상대에게 맡기는 표현이 맞다."
+      }
+    };
+
+    const storeKey = "ghostwritingSystemDataV2";
+    const galleryStoreKey = "ghostwritingGalleryV1";
+    let data = loadData();
+    if (!data.characterImage || data.characterImage === "sucream-logo.png") {
+      data.characterImage = "sucream-logo-transparent.png";
+    }
+    const state = {
+      currentSlot: 0,
+      openedPanels: new Set(),
+      attempts: 0,
+      hintUsed: false,
+      hintSlot: null,
+      final: null,
+      editorTarget: "request",
+      lastPlayScreen: "summaryScreen",
+      galleryTab: "letters"
+    };
+
+    function clone(value) {
+      return JSON.parse(JSON.stringify(value));
+    }
+
+    function makeNormalSlot() {
+      return {
+        title: "새 일반 슬롯",
+        type: "normal",
+        desc: "완성된 문장 중 하나를 고른다.",
+        weight: 20,
+        selected: null,
+        choices: [
+          { text: "선택지 1", score: 5 },
+          { text: "선택지 2", score: 12 },
+          { text: "선택지 3", score: 20 }
+        ]
+      };
+    }
+
+    function makeCoreSlot() {
+      return {
+        title: "새 핵심 슬롯",
+        type: "core",
+        desc: "교체 포인트마다 단어를 고른다.",
+        weight: 30,
+        template: "나는 [point1] 마음을 [point2].",
+        points: [
+          {
+            key: "point1",
+            label: "교체 포인트 1",
+            hint: "의도에 맞는 단어를 고른다.",
+            selected: null,
+            options: [
+              { text: "조심스러운", score: 10 },
+              { text: "솔직한", score: 20 },
+              { text: "진심 어린", score: 30 }
+            ]
+          },
+          {
+            key: "point2",
+            label: "교체 포인트 2",
+            hint: "상대에게 전달될 태도를 고른다.",
+            selected: null,
+            options: [
+              { text: "전하고 싶어", score: 10 },
+              { text: "남기고 싶어", score: 20 },
+              { text: "천천히 전하고 싶어", score: 30 }
+            ]
+          }
+        ]
+      };
+    }
+
+    function escapeHtml(value) {
+      return String(value ?? "")
+        .replaceAll("&", "&amp;")
+        .replaceAll("<", "&lt;")
+        .replaceAll(">", "&gt;")
+        .replaceAll('"', "&quot;");
+    }
+
+    function loadData() {
+      try {
+        return JSON.parse(localStorage.getItem(storeKey)) || clone(sampleData);
+      } catch {
+        return clone(sampleData);
+      }
+    }
+
+    function saveData() {
+      localStorage.setItem(storeKey, JSON.stringify(data));
+    }
+
+    function loadGallery() {
+      try {
+        return JSON.parse(localStorage.getItem(galleryStoreKey)) || { people: {} };
+      } catch {
+        return { people: {} };
+      }
+    }
+
+    function saveGalleryData(gallery) {
+      localStorage.setItem(galleryStoreKey, JSON.stringify(gallery));
+    }
+
+    function showMode(mode) {
+      document.getElementById("playMode").classList.toggle("active", mode === "play");
+      document.getElementById("editMode").classList.toggle("active", mode === "edit");
+      document.getElementById("playModeButton").classList.toggle("active", mode === "play");
+      document.getElementById("galleryModeButton").classList.toggle("active", mode === "gallery");
+      document.getElementById("editModeButton").classList.toggle("active", mode === "edit");
+      if (mode === "gallery") {
+        document.getElementById("playMode").classList.add("active");
+        document.getElementById("editMode").classList.remove("active");
+        showPlayScreen("galleryScreen");
+        renderGallery();
+      }
+      if (mode === "edit") renderEditors();
+    }
+
+    function showPlayScreen(id) {
+      ["summaryScreen", "workScreen", "sealScreen", "galleryScreen"].forEach(screenId => {
+        document.getElementById(screenId).classList.toggle("active", screenId === id);
+      });
+      if (id !== "galleryScreen") state.lastPlayScreen = id;
+    }
+
+    function slotTypeLabel(slot) {
+      return slot.type === "core" ? "핵심 슬롯" : "일반 슬롯";
+    }
+
+    function isSlotComplete(slot) {
+      if (slot.type === "normal") return slot.selected !== null;
+      return slot.points.every(point => point.selected !== null);
+    }
+
+    function getSlotText(slot) {
+      if (slot.type === "normal") {
+        return slot.selected === null ? "미작성" : slot.choices[slot.selected].text;
+      }
+      return slot.points.reduce((sentence, point) => {
+        const value = point.selected === null ? "____" : point.options[point.selected].text;
+        return sentence.replace(`[${point.key}]`, value);
+      }, slot.template);
+    }
+
+    function getSlotScore(slot) {
+      if (!isSlotComplete(slot)) return 0;
+      if (slot.type === "normal") return Math.max(0, Math.min(slot.weight, Number(slot.choices[slot.selected].score) || 0));
+      const raw = slot.points.reduce((sum, point) => sum + (Number(point.options[point.selected].score) || 0), 0);
+      return Math.min(slot.weight, Math.round(raw / slot.points.length));
+    }
+
+    function calculateScore() {
+      return Math.max(0, Math.min(100, data.slots.reduce((sum, slot) => sum + getSlotScore(slot), 0)));
+    }
+
+    function getGrade(score) {
+      if (score >= 90) return "완벽";
+      if (score >= 65) return "적정";
+      if (score >= 31) return "아쉬움";
+      return "부족";
+    }
+
+    function getLetterText() {
+      return data.slots.map(getSlotText).join("\n\n");
+    }
+
+    function renderSummary() {
+      document.getElementById("clientNameView").textContent = `의뢰인: ${data.clientName}`;
+      document.getElementById("clientIntroView").textContent = data.clientIntro;
+      document.getElementById("characterImageView").src = data.characterImage || "sucream-logo-transparent.png";
+      const summaryLeft = document.getElementById("summaryLeft");
+      const summaryRight = document.getElementById("summaryRight");
+      summaryLeft.innerHTML = "";
+      summaryRight.innerHTML = "";
+      data.panels.forEach((panel, index) => {
+        const item = document.createElement("article");
+        item.className = `panel info-panel ${state.openedPanels.has(index) ? "open" : ""}`;
+        item.innerHTML = `
+          <button type="button">
+            <strong>${panel.title}</strong>
+            <span class="badge">${state.openedPanels.has(index) ? "열림" : "닫힘"}</span>
+          </button>
+          <div class="body">${panel.body}</div>
+        `;
+        item.querySelector("button").addEventListener("click", () => {
+          state.openedPanels.add(index);
+          renderSummary();
+        });
+        const target = index % 2 === 0 ? summaryLeft : summaryRight;
+        target.appendChild(item);
+      });
+      const ready = state.openedPanels.size === data.panels.length;
+      const startButton = document.getElementById("startButton");
+      startButton.disabled = !ready;
+      startButton.classList.toggle("ready", ready);
+      startButton.setAttribute("aria-label", ready ? "대필 작업 시작" : "모든 요약 패널을 먼저 확인해야 한다");
+    }
+
+    function renderSlotList() {
+      const slotList = document.getElementById("slotList");
+      slotList.innerHTML = "";
+      data.slots.forEach((slot, index) => {
+        const button = document.createElement("button");
+        button.type = "button";
+        button.className = `slot-button ${index === state.currentSlot ? "active" : ""}`;
+        button.innerHTML = `
+          <span><strong>${slot.title}</strong><br><small>${slotTypeLabel(slot)}</small></span>
+          <span class="badge">${isSlotComplete(slot) ? "완료" : "미완"}</span>
+        `;
+        button.addEventListener("click", () => {
+          state.currentSlot = index;
+          renderSlotEditor();
+        });
+        slotList.appendChild(button);
+      });
+    }
+
+    function renderSlotEditor() {
+      const slot = data.slots[state.currentSlot];
+      document.getElementById("slotTitle").textContent = slot.title;
+      document.getElementById("slotDesc").textContent = slot.desc;
+      document.getElementById("slotType").textContent = slotTypeLabel(slot);
+      const editor = document.getElementById("slotEditor");
+      editor.innerHTML = "";
+
+      if (slot.type === "normal") {
+        const list = document.createElement("div");
+        list.className = "choice-list";
+        slot.choices.forEach((choice, index) => {
+          const wrap = document.createElement("div");
+          wrap.className = "choice-wrap";
+          const button = document.createElement("button");
+          button.type = "button";
+          button.className = `choice ${slot.selected === index ? "active" : ""}`;
+          button.textContent = choice.text;
+          button.addEventListener("click", () => {
+            slot.selected = index;
+            renderSlotEditor();
+          });
+          wrap.appendChild(button);
+          if (state.hintSlot === state.currentSlot) {
+            const bubble = document.createElement("div");
+            bubble.className = "reaction-bubble";
+            bubble.textContent = getReactionText(Number(choice.score) || 0, Number(slot.weight) || 1, `문장 ${index + 1}`);
+            wrap.appendChild(bubble);
+          }
+          list.appendChild(wrap);
+        });
+        editor.appendChild(list);
+      } else {
+        const preview = document.createElement("div");
+        preview.className = "sentence-preview";
+        preview.textContent = getSlotText(slot);
+        editor.appendChild(preview);
+
+        const pointList = document.createElement("div");
+        pointList.className = "point-list";
+        slot.points.forEach((point, pointIndex) => {
+          const pointEl = document.createElement("section");
+          pointEl.className = "point";
+          pointEl.innerHTML = `
+            <div class="point-title">
+              <strong>${point.label}</strong>
+              <span>${point.hint}</span>
+            </div>
+            <div class="word-options"></div>
+          `;
+          const options = pointEl.querySelector(".word-options");
+          point.options.forEach((option, optionIndex) => {
+            const wrap = document.createElement("div");
+            wrap.className = "word-wrap";
+            const button = document.createElement("button");
+            button.type = "button";
+            button.className = point.selected === optionIndex ? "active" : "";
+            button.textContent = option.text;
+            button.addEventListener("click", () => {
+              data.slots[state.currentSlot].points[pointIndex].selected = optionIndex;
+              renderSlotEditor();
+            });
+            wrap.appendChild(button);
+            if (state.hintSlot === state.currentSlot) {
+              const bubble = document.createElement("div");
+              bubble.className = "reaction-bubble";
+              bubble.textContent = getReactionText(Number(option.score) || 0, Number(slot.weight) || 1, option.text);
+              wrap.appendChild(bubble);
+            }
+            options.appendChild(wrap);
+          });
+          pointList.appendChild(pointEl);
+        });
+        editor.appendChild(pointList);
+      }
+
+      updateStatus();
+    }
+
+    function updateStatus() {
+      const score = calculateScore();
+      const grade = getGrade(score);
+      document.getElementById("attemptText").textContent = `${state.attempts} / 4`;
+      document.getElementById("scoreText").textContent = `${score}%`;
+      document.getElementById("gradeText").textContent = grade;
+      document.getElementById("faithText").textContent = state.final ? `${state.final.faith}/5` : "-";
+      document.getElementById("letterPreview").textContent = getLetterText();
+      document.getElementById("deliverButton").disabled = !data.slots.every(isSlotComplete) || state.final !== null;
+      renderSlotList();
+      renderHintPanel();
+    }
+
+    function getFeedback(score, grade) {
+      if (grade === "완벽") return data.feedback.perfect;
+      if (grade === "적정") return data.feedback.adequate;
+      if (grade === "아쉬움") return data.feedback.weak;
+      return data.feedback.poor;
+    }
+
+    function getReactionText(score, maxScore, label) {
+      const rate = maxScore > 0 ? score / maxScore : 0;
+      if (rate >= .82) return `${label}: 이 표현은 마음을 정확히 건드려.`;
+      if (rate >= .52) return `${label}: 방향은 맞지만 조금 더 섬세했으면 해.`;
+      return `${label}: 이 말은 상대에게 부담이나 변명처럼 들릴 수 있어.`;
+    }
+
+    function renderHintPanel() {
+      const slot = data.slots[state.currentSlot];
+      const panel = document.getElementById("hintPanel");
+      if (state.hintUsed) {
+        const usedSlot = data.slots[state.hintSlot];
+        panel.innerHTML = `
+          <h3>무료 힌트 사용됨</h3>
+          <p class="hint">${usedSlot ? usedSlot.title : "선택한 슬롯"}에 캐릭터 반응이 표시된다.</p>
+        `;
+        return;
+      }
+      panel.innerHTML = `
+        <h3>무료 힌트</h3>
+        <p>원하는 슬롯 하나에만 1회 사용할 수 있다. 사용하면 해당 슬롯의 문장/단어별 캐릭터 반응이 말풍선으로 표시된다.</p>
+        <button id="useHintButton" class="hint-button">현재 슬롯에 힌트 사용</button>
+      `;
+      document.getElementById("useHintButton").addEventListener("click", () => {
+        state.hintUsed = true;
+        state.hintSlot = state.currentSlot;
+        renderSlotEditor();
+      });
+    }
+
+    function resultFromAttempt(passed, grade) {
+      if (!passed) return { faith: 0, gallery: "미완성", reaction: "작업물 미완성 보관. 관계 영향 가능." };
+      if (state.attempts === 1 && grade === "완벽") return { faith: 5, gallery: "완성", reaction: "최고 결과. 인물의 특별 대사." };
+      if (state.attempts === 1) return { faith: 4, gallery: "완성", reaction: "일부 슬롯 미충족. 인물의 만족하는 대사." };
+      if (state.attempts === 2) return { faith: 3, gallery: "아쉬운 완성", reaction: "수정 1회 소요." };
+      if (state.attempts === 3) return { faith: 2, gallery: "실패한 완성", reaction: "수정 2회 소요." };
+      return { faith: 1, gallery: "실패한 완성", reaction: "수정 3회 소요." };
+    }
+
+    function getProfileLevel(passed, grade) {
+      if (!passed) return 0;
+      if (state.attempts === 1 && grade === "완벽") return 4;
+      if (state.attempts === 1) return 3;
+      if (state.attempts === 2) return 2;
+      return 1;
+    }
+
+    function buildGalleryRecord() {
+      const score = calculateScore();
+      const grade = getGrade(score);
+      const passed = score >= 65;
+      return {
+        id: `${Date.now()}`,
+        clientName: data.clientName,
+        characterImage: data.characterImage,
+        letter: getLetterText(),
+        score,
+        grade,
+        attempts: state.attempts,
+        faith: state.final ? state.final.faith : 0,
+        galleryState: state.final ? state.final.gallery : "미완성",
+        reaction: state.final ? state.final.reaction : "미저장",
+        profileLevel: getProfileLevel(passed, grade),
+        savedAt: new Date().toLocaleString("ko-KR")
+      };
+    }
+
+    function saveCurrentToGallery() {
+      if (!state.final) return;
+      const record = buildGalleryRecord();
+      const gallery = loadGallery();
+      if (!gallery.people[record.clientName]) {
+        gallery.people[record.clientName] = {
+          name: record.clientName,
+          image: record.characterImage,
+          bestProfileLevel: 0,
+          bestScore: 0,
+          letters: [],
+          gifts: [],
+          cgs: []
+        };
+      }
+      const person = gallery.people[record.clientName];
+      person.image = record.characterImage;
+      person.letters.push(record);
+      person.letters.sort((a, b) => b.score - a.score);
+      person.bestScore = Math.max(person.bestScore || 0, record.score);
+      person.bestProfileLevel = Math.max(person.bestProfileLevel || 0, record.profileLevel);
+      saveGalleryData(gallery);
+      document.getElementById("saveGalleryButton").disabled = true;
+      document.getElementById("saveGalleryButton").textContent = "저장됨";
+      document.getElementById("resultLine").textContent = "갤러리에 편지와 인물 정보가 저장됐다.";
+      renderGallery();
+    }
+
+    function collectionProgress(tab, person) {
+      if (!person) return "0/1";
+      if (tab === "letters") return `${person.letters.length}/1`;
+      if (tab === "profile") return `${person.bestProfileLevel >= 4 ? 4 : person.bestProfileLevel}/4`;
+      if (tab === "gifts") return `${person.gifts.length}/1`;
+      return `${person.cgs.length}/1`;
+    }
+
+    function renderGallery() {
+      const gallery = loadGallery();
+      const people = Object.values(gallery.people);
+      const person = people[0];
+      document.querySelectorAll(".gallery-tab").forEach(button => {
+        button.classList.toggle("active", button.dataset.tab === state.galleryTab);
+      });
+      const progress = collectionProgress(state.galleryTab, person);
+      const badge = progress.split("/")[0] === progress.split("/")[1] && progress !== "0/1"
+        ? `<span class="achievement-badge">100% 달성</span>`
+        : "";
+      const content = document.getElementById("galleryContent");
+      if (!person) {
+        content.innerHTML = `
+          <h2>수집 기록 없음</h2>
+          <p class="progress-line">현재 수집률 0/1</p>
+          <p>전달 결과 화면에서 갤러리에 저장하면 편지와 인물 정보가 등록된다.</p>
+        `;
+        return;
+      }
+
+      if (state.galleryTab === "letters") {
+        content.innerHTML = `
+          <h2>${person.name} / 편지 ${badge}</h2>
+          <p class="progress-line">수집률 ${progress}. 동일 인물은 높은 결과를 기준으로 정렬된다.</p>
+          <div class="archive-grid">
+            ${person.letters.map(letter => `
+              <article class="archive-card">
+                <h3>${letter.galleryState} / ${letter.grade}</h3>
+                <p><b>정확도</b> ${letter.score}% · <b>신성</b> ${letter.faith}/5</p>
+                <p><b>저장</b> ${letter.savedAt}</p>
+                <div class="letter-body">${escapeHtml(letter.letter)}</div>
+              </article>
+            `).join("")}
+          </div>
+        `;
+      } else if (state.galleryTab === "profile") {
+        const level = person.bestProfileLevel || 0;
+        content.innerHTML = `
+          <h2>${person.name} / 인물 정보 ${level >= 4 ? badge : ""}</h2>
+          <p class="progress-line">공개 단계 Lv. ${level} / 4</p>
+          <div class="archive-card">
+            <p><b>Lv. 0</b> 인물 이름·외형: ${person.name}</p>
+            <p class="${level >= 1 ? "" : "profile-lock"}"><b>Lv. 1</b> 기본 성격·직업·나이: ${level >= 1 ? "조심스럽고 감정을 정리해 말하는 의뢰인." : "잠금"}</p>
+            <p class="${level >= 2 ? "" : "profile-lock"}"><b>Lv. 2</b> 고민·의뢰 동기: ${level >= 2 ? data.clientIntro : "잠금"}</p>
+            <p class="${level >= 3 ? "" : "profile-lock"}"><b>Lv. 3</b> 과거·관계 단서: ${level >= 3 ? "상대에게 상처를 준 사건을 오래 품고 있다." : "잠금"}</p>
+            <p class="${level >= 4 ? "" : "profile-lock"}"><b>Lv. 4</b> 내면 독백·숨겨진 감정: ${level >= 4 ? "용서를 강요하지 않으면서도 다시 이어지고 싶은 마음을 숨기고 있다." : "잠금"}</p>
+          </div>
+        `;
+      } else if (state.galleryTab === "gifts") {
+        content.innerHTML = `
+          <h2>${person.name} / 선물</h2>
+          <p class="progress-line">수집률 ${progress}</p>
+          <div class="archive-card">아직 인게임에서 받은 선물이 없다.</div>
+        `;
+      } else {
+        content.innerHTML = `
+          <h2>${person.name} / CG</h2>
+          <p class="progress-line">수집률 ${progress}</p>
+          <div class="archive-card">아직 재생한 이벤트 CG가 없다. 씬 스킵 시 등록되지 않는다.</div>
+        `;
+      }
+    }
+
+    function deliver() {
+      state.attempts += 1;
+      const score = calculateScore();
+      const grade = getGrade(score);
+      const passed = score >= 65;
+      const finalTry = state.attempts >= 4;
+      document.getElementById("feedbackPanel").innerHTML = `
+        <h3>의뢰인 피드백</h3>
+        <p>${getFeedback(score, grade)}</p>
+        <p class="${passed ? "good" : "bad"}">판정: ${grade} (${score}%)</p>
+      `;
+
+      if (passed || finalTry) {
+        state.final = resultFromAttempt(passed, grade);
+        document.getElementById("galleryPanel").innerHTML = `
+          <h3>갤러리 상태</h3>
+          <p><strong>${state.final.gallery}</strong> 상태로 보관된다.</p>
+          <p>${state.final.reaction}</p>
+        `;
+        document.getElementById("finalLetter").textContent = getLetterText();
+        document.getElementById("resultLine").textContent = passed ? "피드백 완료. 인장을 찍으면 전달 시퀀스가 진행된다." : "최대 시도 초과. 미완성 작업물로 보관된다.";
+        document.getElementById("resultScore").textContent = `${score}% / ${grade}`;
+        document.getElementById("resultFaith").textContent = `${state.final.faith}/5`;
+        document.getElementById("resultGallery").textContent = state.final.gallery;
+        document.getElementById("resultReaction").textContent = state.final.reaction;
+        document.getElementById("saveGalleryButton").disabled = false;
+        document.getElementById("saveGalleryButton").textContent = "갤러리에 저장";
+        showPlayScreen("sealScreen");
+      }
+      updateStatus();
+    }
+
+    function resetPlayState() {
+      state.currentSlot = 0;
+      state.openedPanels.clear();
+      state.attempts = 0;
+      state.hintUsed = false;
+      state.hintSlot = null;
+      state.final = null;
+      data.slots.forEach(slot => {
+        slot.selected = null;
+        if (slot.points) slot.points.forEach(point => { point.selected = null; });
+      });
+      document.getElementById("hintPanel").innerHTML = "<h3>무료 힌트</h3><p>원하는 슬롯 하나에만 1회 사용할 수 있다.</p>";
+      document.getElementById("feedbackPanel").innerHTML = "<h3>의뢰인 피드백</h3><p>모든 슬롯을 완성하면 전달할 수 있다.</p>";
+      document.getElementById("galleryPanel").innerHTML = "<h3>갤러리 상태</h3><p>아직 보관된 작업물이 없다.</p>";
+      document.getElementById("stampTarget").classList.remove("stamped");
+      document.getElementById("stampTarget").textContent = "인장 찍기";
+      document.getElementById("saveGalleryButton").disabled = false;
+      document.getElementById("saveGalleryButton").textContent = "갤러리에 저장";
+      renderSummary();
+      renderSlotEditor();
+      showPlayScreen("summaryScreen");
+    }
+
+    function setEditorSection(target) {
+      state.editorTarget = target;
+      document.querySelectorAll(".editor-nav").forEach(button => {
+        button.classList.toggle("active", button.dataset.target === target);
+      });
+      document.querySelectorAll(".editor-section").forEach(section => {
+        section.style.display = "none";
+      });
+      document.getElementById(`${target}Editor`).style.display = "block";
+    }
+
+    function field(label, id, value, type = "input") {
+      if (type === "textarea") {
+        return `<div class="field"><label for="${id}">${label}</label><textarea id="${id}">${escapeHtml(value)}</textarea></div>`;
+      }
+      return `<div class="field"><label for="${id}">${label}</label><input id="${id}" value="${escapeHtml(value)}" /></div>`;
+    }
+
+    function renderEditors() {
+      renderRequestEditor();
+      renderPanelsEditor();
+      renderSlotsEditor();
+      renderResultEditor();
+      setEditorSection(state.editorTarget);
+    }
+
+    function renderRequestEditor() {
+      document.getElementById("requestEditor").innerHTML = `
+        <h2>의뢰 기본 정보</h2>
+        ${field("의뢰인", "editClientName", data.clientName)}
+        ${field("캐릭터 이미지 경로", "editCharacterImage", data.characterImage || "sucream-logo-transparent.png")}
+        ${field("의뢰 소개", "editClientIntro", data.clientIntro, "textarea")}
+      `;
+    }
+
+    function renderPanelsEditor() {
+      const html = data.panels.map((panel, index) => `
+        <div class="edit-section">
+          <div class="slot-header">
+            <h3>패널 ${index + 1}</h3>
+            <button data-action="delete-panel" data-index="${index}">삭제</button>
+          </div>
+          ${field("제목", `panelTitle${index}`, panel.title)}
+          ${field("내용", `panelBody${index}`, panel.body, "textarea")}
+        </div>
+      `).join("");
+      document.getElementById("panelsEditor").innerHTML = `
+        <h2>요약 패널</h2>
+        <p class="subtitle">의뢰 내용, 핵심 키워드, 캐릭터 성향, 과거 힌트 등 정보 확인 화면의 패널을 바꾼다.</p>
+        ${html}
+        <div class="row"><button data-action="add-panel">패널 추가</button></div>
+      `;
+    }
+
+    function renderSlotsEditor() {
+      const html = data.slots.map((slot, slotIndex) => {
+        const body = slot.type === "normal"
+          ? slot.choices.map((choice, choiceIndex) => `
+              <div class="small-grid">
+                ${field(`선택지 ${choiceIndex + 1}`, `slot${slotIndex}Choice${choiceIndex}`, choice.text)}
+                ${field("점수", `slot${slotIndex}ChoiceScore${choiceIndex}`, choice.score)}
+              </div>
+              <div class="row"><button data-action="delete-choice" data-slot="${slotIndex}" data-choice="${choiceIndex}">선택지 삭제</button></div>
+            `).join("")
+          : `
+              ${field("문장 템플릿", `slot${slotIndex}Template`, slot.template, "textarea")}
+              <p class="subtitle">교체 지점은 [fault]처럼 대괄호 키로 표시한다. 아래 포인트 키와 같아야 한다.</p>
+              ${slot.points.map((point, pointIndex) => `
+                <div class="edit-section">
+                  <div class="slot-header">
+                    <h3>교체 포인트 ${pointIndex + 1}</h3>
+                    <button data-action="delete-point" data-slot="${slotIndex}" data-point="${pointIndex}">삭제</button>
+                  </div>
+                  <div class="small-grid">
+                    ${field("키", `slot${slotIndex}Point${pointIndex}Key`, point.key)}
+                    ${field("라벨", `slot${slotIndex}Point${pointIndex}Label`, point.label)}
+                  </div>
+                  ${field("힌트", `slot${slotIndex}Point${pointIndex}Hint`, point.hint, "textarea")}
+                  ${point.options.map((option, optionIndex) => `
+                    <div class="small-grid">
+                      ${field(`단어 ${optionIndex + 1}`, `slot${slotIndex}Point${pointIndex}Option${optionIndex}`, option.text)}
+                      ${field("점수", `slot${slotIndex}Point${pointIndex}Score${optionIndex}`, option.score)}
+                    </div>
+                    <div class="row"><button data-action="delete-option" data-slot="${slotIndex}" data-point="${pointIndex}" data-option="${optionIndex}">단어 삭제</button></div>
+                  `).join("")}
+                  <div class="row"><button data-action="add-option" data-slot="${slotIndex}" data-point="${pointIndex}">단어 추가</button></div>
+                </div>
+              `).join("")}
+              <div class="row"><button data-action="add-point" data-slot="${slotIndex}">교체 포인트 추가</button></div>
+            `;
+        return `
+          <div class="edit-section">
+            <div class="slot-header">
+              <h3>슬롯 ${slotIndex + 1}</h3>
+              <button data-action="delete-slot" data-slot="${slotIndex}">삭제</button>
+            </div>
+            <div class="small-grid">
+              ${field("제목", `slot${slotIndex}Title`, slot.title)}
+              <div class="field">
+                <label for="slot${slotIndex}Weight">가중치</label>
+                <input id="slot${slotIndex}Weight" value="${slot.weight}" />
+              </div>
+            </div>
+            <div class="field">
+              <label for="slot${slotIndex}Type">유형</label>
+              <select id="slot${slotIndex}Type">
+                <option value="normal" ${slot.type === "normal" ? "selected" : ""}>일반 슬롯</option>
+                <option value="core" ${slot.type === "core" ? "selected" : ""}>핵심 슬롯</option>
+              </select>
+            </div>
+            ${field("설명", `slot${slotIndex}Desc`, slot.desc, "textarea")}
+            ${body}
+            ${slot.type === "normal" ? `<div class="row"><button data-action="add-choice" data-slot="${slotIndex}">선택지 추가</button></div>` : ""}
+          </div>
+        `;
+      }).join("");
+      document.getElementById("slotsEditor").innerHTML = `
+        <h2>대필 슬롯</h2>
+        <p class="subtitle">플레이어에게 보이는 문장 선택지와 핵심 슬롯 단어를 수정한다. 슬롯, 선택지, 교체 포인트도 추가·삭제할 수 있다.</p>
+        ${html}
+        <div class="row">
+          <button data-action="add-normal-slot">일반 슬롯 추가</button>
+          <button data-action="add-core-slot">핵심 슬롯 추가</button>
+        </div>
+      `;
+    }
+
+    function renderResultEditor() {
+      document.getElementById("resultEditor").innerHTML = `
+        <h2>피드백 문구</h2>
+        ${field("완벽", "feedbackPerfect", data.feedback.perfect, "textarea")}
+        ${field("적정", "feedbackAdequate", data.feedback.adequate, "textarea")}
+        ${field("아쉬움", "feedbackWeak", data.feedback.weak, "textarea")}
+        ${field("부족", "feedbackPoor", data.feedback.poor, "textarea")}
+        ${field("무료 힌트", "feedbackHint", data.feedback.hint, "textarea")}
+      `;
+    }
+
+    function readValue(id) {
+      const el = document.getElementById(id);
+      return el ? el.value.trim() : "";
+    }
+
+    function readNumber(id, fallback) {
+      const value = Number(readValue(id));
+      return Number.isFinite(value) ? value : fallback;
+    }
+
+    function syncEditorValues() {
+      data.clientName = readValue("editClientName") || data.clientName;
+      data.characterImage = readValue("editCharacterImage") || data.characterImage || "sucream-logo-transparent.png";
+      data.clientIntro = readValue("editClientIntro") || data.clientIntro;
+
+      data.panels.forEach((panel, index) => {
+        panel.title = readValue(`panelTitle${index}`) || panel.title;
+        panel.body = readValue(`panelBody${index}`) || panel.body;
+      });
+
+      data.slots.forEach((slot, slotIndex) => {
+        slot.title = readValue(`slot${slotIndex}Title`) || slot.title;
+        slot.weight = readNumber(`slot${slotIndex}Weight`, slot.weight);
+        const nextType = readValue(`slot${slotIndex}Type`) || slot.type;
+        if (nextType !== slot.type) {
+          slot.type = nextType;
+          slot.selected = null;
+          if (slot.type === "normal") {
+            slot.choices = slot.choices || [
+              { text: "선택지 1", score: Math.round(slot.weight * .35) },
+              { text: "선택지 2", score: Math.round(slot.weight * .7) },
+              { text: "선택지 3", score: slot.weight }
+            ];
+          } else {
+            slot.template = slot.template || "나는 [point1] 마음을 [point2].";
+            slot.points = slot.points || [
+              {
+                key: "point1",
+                label: "교체 포인트 1",
+                hint: "의도에 맞는 단어를 고른다.",
+                selected: null,
+                options: [
+                  { text: "조심스러운", score: Math.round(slot.weight * .35) },
+                  { text: "솔직한", score: Math.round(slot.weight * .7) },
+                  { text: "진심 어린", score: slot.weight }
+                ]
+              },
+              {
+                key: "point2",
+                label: "교체 포인트 2",
+                hint: "상대에게 전달될 태도를 고른다.",
+                selected: null,
+                options: [
+                  { text: "전하고 싶어", score: Math.round(slot.weight * .35) },
+                  { text: "남기고 싶어", score: Math.round(slot.weight * .7) },
+                  { text: "천천히 전하고 싶어", score: slot.weight }
+                ]
+              }
+            ];
+          }
+        } else {
+          slot.type = nextType;
+        }
+        slot.desc = readValue(`slot${slotIndex}Desc`) || slot.desc;
+        if (slot.type === "normal") {
+          slot.choices.forEach((choice, choiceIndex) => {
+            choice.text = readValue(`slot${slotIndex}Choice${choiceIndex}`) || choice.text;
+            choice.score = readNumber(`slot${slotIndex}ChoiceScore${choiceIndex}`, choice.score);
+          });
+        } else {
+          slot.template = readValue(`slot${slotIndex}Template`) || slot.template;
+          slot.points.forEach((point, pointIndex) => {
+            point.key = readValue(`slot${slotIndex}Point${pointIndex}Key`) || point.key;
+            point.label = readValue(`slot${slotIndex}Point${pointIndex}Label`) || point.label;
+            point.hint = readValue(`slot${slotIndex}Point${pointIndex}Hint`) || point.hint;
+            point.options.forEach((option, optionIndex) => {
+              option.text = readValue(`slot${slotIndex}Point${pointIndex}Option${optionIndex}`) || option.text;
+              option.score = readNumber(`slot${slotIndex}Point${pointIndex}Score${optionIndex}`, option.score);
+            });
+          });
+        }
+      });
+
+      data.feedback.perfect = readValue("feedbackPerfect") || data.feedback.perfect;
+      data.feedback.adequate = readValue("feedbackAdequate") || data.feedback.adequate;
+      data.feedback.weak = readValue("feedbackWeak") || data.feedback.weak;
+      data.feedback.poor = readValue("feedbackPoor") || data.feedback.poor;
+      data.feedback.hint = readValue("feedbackHint") || data.feedback.hint;
+    }
+
+    function applyEditorValues() {
+      syncEditorValues();
+      saveData();
+      resetPlayState();
+      renderEditors();
+      document.getElementById("saveNote").textContent = "저장됨. 플레이 모드에 즉시 반영됐다.";
+    }
+
+    function finishEditorMutation(message) {
+      saveData();
+      resetPlayState();
+      renderEditors();
+      document.getElementById("saveNote").textContent = message;
+    }
+
+    function handleEditorAction(event) {
+      const button = event.target.closest("[data-action]");
+      if (!button) return;
+      const action = button.dataset.action;
+      syncEditorValues();
+      if (action === "add-panel") {
+        data.panels.push({ title: "새 패널", body: "새 정보 내용을 입력한다." });
+        finishEditorMutation("패널이 추가됐다.");
+      }
+      if (action === "delete-panel" && data.panels.length > 1) {
+        data.panels.splice(Number(button.dataset.index), 1);
+        finishEditorMutation("패널이 삭제됐다.");
+      }
+      if (action === "add-normal-slot") {
+        data.slots.push(makeNormalSlot());
+        finishEditorMutation("일반 슬롯이 추가됐다.");
+      }
+      if (action === "add-core-slot") {
+        data.slots.push(makeCoreSlot());
+        finishEditorMutation("핵심 슬롯이 추가됐다.");
+      }
+      if (action === "delete-slot" && data.slots.length > 1) {
+        data.slots.splice(Number(button.dataset.slot), 1);
+        state.currentSlot = 0;
+        finishEditorMutation("슬롯이 삭제됐다.");
+      }
+      if (action === "add-choice") {
+        const slot = data.slots[Number(button.dataset.slot)];
+        slot.choices.push({ text: `선택지 ${slot.choices.length + 1}`, score: Math.round(slot.weight * .5) });
+        finishEditorMutation("선택지가 추가됐다.");
+      }
+      if (action === "delete-choice") {
+        const slot = data.slots[Number(button.dataset.slot)];
+        if (slot.choices.length > 1) slot.choices.splice(Number(button.dataset.choice), 1);
+        finishEditorMutation("선택지가 삭제됐다.");
+      }
+      if (action === "add-point") {
+        const slot = data.slots[Number(button.dataset.slot)];
+        const next = slot.points.length + 1;
+        slot.points.push({
+          key: `point${next}`,
+          label: `교체 포인트 ${next}`,
+          hint: "의도에 맞는 단어를 고른다.",
+          selected: null,
+          options: [
+            { text: "낮은 적합 단어", score: Math.round(slot.weight * .25) },
+            { text: "중간 적합 단어", score: Math.round(slot.weight * .55) },
+            { text: "높은 적합 단어", score: slot.weight }
+          ]
+        });
+        if (!slot.template.includes(`[point${next}]`)) slot.template += ` [point${next}]`;
+        finishEditorMutation("교체 포인트가 추가됐다.");
+      }
+      if (action === "delete-point") {
+        const slot = data.slots[Number(button.dataset.slot)];
+        if (slot.points.length > 1) slot.points.splice(Number(button.dataset.point), 1);
+        finishEditorMutation("교체 포인트가 삭제됐다.");
+      }
+      if (action === "add-option") {
+        const point = data.slots[Number(button.dataset.slot)].points[Number(button.dataset.point)];
+        point.options.push({ text: `단어 ${point.options.length + 1}`, score: 10 });
+        finishEditorMutation("단어가 추가됐다.");
+      }
+      if (action === "delete-option") {
+        const point = data.slots[Number(button.dataset.slot)].points[Number(button.dataset.point)];
+        if (point.options.length > 1) point.options.splice(Number(button.dataset.option), 1);
+        finishEditorMutation("단어가 삭제됐다.");
+      }
+    }
+
+    document.getElementById("playModeButton").addEventListener("click", () => {
+      showMode("play");
+      showPlayScreen(state.lastPlayScreen || "summaryScreen");
+    });
+    document.getElementById("galleryModeButton").addEventListener("click", () => showMode("gallery"));
+    document.getElementById("editModeButton").addEventListener("click", () => showMode("edit"));
+    document.getElementById("startButton").addEventListener("click", () => {
+      showPlayScreen("workScreen");
+      renderSlotEditor();
+    });
+    document.getElementById("prevSlot").addEventListener("click", () => {
+      state.currentSlot = Math.max(0, state.currentSlot - 1);
+      renderSlotEditor();
+    });
+    document.getElementById("nextSlot").addEventListener("click", () => {
+      state.currentSlot = Math.min(data.slots.length - 1, state.currentSlot + 1);
+      renderSlotEditor();
+    });
+    document.getElementById("deliverButton").addEventListener("click", deliver);
+    document.getElementById("restartButton").addEventListener("click", resetPlayState);
+    document.getElementById("saveGalleryButton").addEventListener("click", saveCurrentToGallery);
+    document.getElementById("backToWorkButton").addEventListener("click", () => {
+      showMode("play");
+      showPlayScreen(state.lastPlayScreen || "summaryScreen");
+    });
+    document.querySelectorAll(".gallery-tab").forEach(button => {
+      button.addEventListener("click", () => {
+        state.galleryTab = button.dataset.tab;
+        renderGallery();
+      });
+    });
+    document.getElementById("stampTarget").addEventListener("click", event => {
+      event.currentTarget.classList.add("stamped");
+      event.currentTarget.textContent = "전달";
+      document.getElementById("resultLine").textContent = "인장이 찍혔다. 편지는 전달 시퀀스로 넘어간다.";
+    });
+    document.querySelectorAll(".editor-nav").forEach(button => {
+      button.addEventListener("click", () => setEditorSection(button.dataset.target));
+    });
+    document.getElementById("saveDataButton").addEventListener("click", applyEditorValues);
+    document.getElementById("editMode").addEventListener("click", handleEditorAction);
+    document.getElementById("resetDataButton").addEventListener("click", () => {
+      data = clone(sampleData);
+      saveData();
+      resetPlayState();
+      renderEditors();
+      document.getElementById("saveNote").textContent = "샘플 데이터로 초기화됐다.";
+    });
+
+    renderSummary();
+    renderSlotEditor();
+    renderEditors();
+    if (location.hash === "#edit") showMode("edit");
+    if (location.hash === "#gallery") showMode("gallery");
+  </script>
+</body>
+</html>
