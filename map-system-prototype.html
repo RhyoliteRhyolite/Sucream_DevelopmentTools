@@ -1,0 +1,1474 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Map System Prototype</title>
+  <style>
+    :root {
+      --bg: #121316;
+      --panel: rgba(18, 19, 22, 0.82);
+      --panel-strong: rgba(24, 25, 28, 0.94);
+      --text: #f4efe6;
+      --muted: #a9a192;
+      --line: rgba(244, 239, 230, 0.16);
+      --gold: #e7bd5b;
+      --blue: #6ab6c8;
+      --red: #d75f53;
+      --green: #83bd72;
+      --shadow: 0 20px 70px rgba(0, 0, 0, 0.45);
+      --vignette: rgba(0, 0, 0, 0.34);
+      --blur-opacity: 0;
+      font-family: "Pretendard", "Apple SD Gothic Neo", "Noto Sans KR", system-ui, sans-serif;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      color: var(--text);
+      background: var(--bg);
+      overflow: hidden;
+    }
+
+    button,
+    input {
+      font: inherit;
+    }
+
+    .map-shell {
+      position: relative;
+      min-height: 100vh;
+      isolation: isolate;
+      background:
+        linear-gradient(135deg, rgba(21, 22, 24, 0.42), rgba(15, 16, 18, 0.88)),
+        #24231f;
+    }
+
+    .map-shell::before {
+      content: "";
+      position: absolute;
+      inset: 0;
+      z-index: 2;
+      pointer-events: none;
+      background:
+        radial-gradient(circle at center, transparent 0 42%, var(--vignette) 78%, rgba(0, 0, 0, 0.82) 100%);
+      opacity: 0;
+      transition: opacity 260ms ease, background 260ms ease;
+    }
+
+    .map-shell::after {
+      content: "";
+      position: absolute;
+      inset: 0;
+      z-index: 2;
+      pointer-events: none;
+      opacity: var(--blur-opacity);
+      background:
+        linear-gradient(90deg, transparent 0 18%, rgba(238, 223, 181, 0.18) 19% 21%, transparent 22% 100%),
+        linear-gradient(0deg, transparent 0 66%, rgba(106, 182, 200, 0.12) 67% 70%, transparent 71% 100%);
+      filter: blur(7px);
+      mix-blend-mode: screen;
+      animation: blurDrift 3.7s steps(2, end) infinite;
+    }
+
+    .map-viewport {
+      position: absolute;
+      inset: 0;
+      overflow: hidden;
+      cursor: grab;
+      touch-action: none;
+    }
+
+    .map-viewport.is-panning {
+      cursor: grabbing;
+    }
+
+    .map-world {
+      position: absolute;
+      left: -42vw;
+      top: -34vh;
+      width: 184vw;
+      height: 168vh;
+      min-width: 2200px;
+      min-height: 1400px;
+      transform: translate3d(var(--map-x, 0px), var(--map-y, 0px), 0);
+      transition: transform 80ms linear;
+      will-change: transform;
+    }
+
+    .city-map {
+      position: absolute;
+      inset: 0;
+      overflow: hidden;
+      opacity: 0.98;
+      background:
+        linear-gradient(135deg, rgba(31, 28, 22, 0.16), rgba(15, 16, 18, 0.34)),
+        url("map-background-landscape.png") center / cover no-repeat,
+        #eee9dc;
+      filter: sepia(0.22) contrast(0.96) brightness(0.64) saturate(0.82);
+    }
+
+    .city-map::before {
+      content: "";
+      position: absolute;
+      inset: 0;
+      background:
+        radial-gradient(circle at 50% 50%, rgba(255, 247, 217, 0.18), transparent 36%),
+        repeating-linear-gradient(45deg, rgba(255, 255, 255, 0.045) 0 1px, transparent 1px 5px);
+      pointer-events: none;
+    }
+
+    .city-map::after {
+      content: "";
+      position: absolute;
+      inset: -1px;
+      background:
+        linear-gradient(90deg, rgba(238, 233, 220, 0.68) 0%, rgba(238, 233, 220, 0.34) 8%, transparent 22%, transparent 78%, rgba(238, 233, 220, 0.34) 92%, rgba(238, 233, 220, 0.68) 100%),
+        linear-gradient(0deg, rgba(238, 233, 220, 0.68) 0%, rgba(238, 233, 220, 0.34) 8%, transparent 22%, transparent 78%, rgba(238, 233, 220, 0.34) 92%, rgba(238, 233, 220, 0.68) 100%),
+        radial-gradient(circle at center, transparent 0 54%, rgba(0, 0, 0, 0.28) 82%, rgba(0, 0, 0, 0.62) 100%),
+        repeating-linear-gradient(45deg, rgba(255, 255, 255, 0.025) 0 1px, transparent 1px 5px);
+      backdrop-filter: blur(0.5px);
+      pointer-events: none;
+    }
+
+    .district {
+      position: absolute;
+      display: none;
+      border: 1px solid rgba(238, 223, 181, 0.16);
+      background:
+        linear-gradient(135deg, rgba(244, 239, 230, 0.055), rgba(244, 239, 230, 0.01)),
+        rgba(0, 0, 0, 0.04);
+      box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.1);
+      transform: rotate(var(--tilt));
+    }
+
+    .district::after {
+      content: attr(data-zone);
+      position: absolute;
+      left: 10px;
+      top: 8px;
+      color: rgba(244, 239, 230, 0.18);
+      font-size: 11px;
+      font-weight: 800;
+      letter-spacing: 0;
+    }
+
+    .district:nth-child(1) { left: 9%; top: 18%; width: 22%; height: 18%; --tilt: 7deg; }
+    .district:nth-child(2) { left: 36%; top: 12%; width: 25%; height: 22%; --tilt: -4deg; }
+    .district:nth-child(3) { left: 66%; top: 16%; width: 20%; height: 17%; --tilt: 5deg; }
+    .district:nth-child(4) { left: 17%; top: 48%; width: 24%; height: 25%; --tilt: -6deg; }
+    .district:nth-child(5) { left: 48%; top: 42%; width: 20%; height: 24%; --tilt: 8deg; }
+    .district:nth-child(6) { left: 71%; top: 55%; width: 16%; height: 20%; --tilt: -5deg; }
+
+    .topbar {
+      position: relative;
+      z-index: 5;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+      padding: 18px 22px;
+    }
+
+    .divinity-panel,
+    .legend,
+    .side-panel {
+      border: 1px solid rgba(231, 189, 91, 0.18);
+      background:
+        linear-gradient(135deg, rgba(34, 31, 25, 0.9), rgba(15, 16, 18, 0.86)),
+        var(--panel);
+      box-shadow: var(--shadow);
+      backdrop-filter: blur(16px);
+    }
+
+    .divinity-panel {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      min-width: min(440px, calc(100vw - 44px));
+      padding: 12px 14px;
+      border-radius: 8px;
+    }
+
+    .divinity-orb {
+      width: 44px;
+      height: 44px;
+      display: grid;
+      place-items: center;
+      border: 1px solid rgba(231, 189, 91, 0.42);
+      border-radius: 50%;
+      color: var(--gold);
+      background: rgba(231, 189, 91, 0.12);
+      flex: 0 0 auto;
+    }
+
+    .divinity-main {
+      min-width: 0;
+      flex: 1;
+    }
+
+    .divinity-row {
+      display: flex;
+      align-items: baseline;
+      justify-content: space-between;
+      gap: 12px;
+      margin-bottom: 7px;
+    }
+
+    .label {
+      color: var(--muted);
+      font-size: 12px;
+      letter-spacing: 0;
+    }
+
+    .value {
+      font-size: 22px;
+      font-weight: 800;
+      color: var(--gold);
+    }
+
+    .music-state {
+      font-size: 13px;
+      color: var(--text);
+      white-space: nowrap;
+    }
+
+    .meter {
+      height: 8px;
+      overflow: hidden;
+      border-radius: 999px;
+      background: rgba(244, 239, 230, 0.13);
+    }
+
+    .meter-fill {
+      height: 100%;
+      width: var(--divinity-width);
+      border-radius: inherit;
+      background: linear-gradient(90deg, var(--green), var(--gold));
+      transition: width 220ms ease, background 220ms ease;
+    }
+
+    .state-faint {
+      --vignette: rgba(0, 0, 0, 0.5);
+      --blur-opacity: 0;
+    }
+
+    .state-faint .map-shell::before {
+      opacity: 0.72;
+    }
+
+    .state-faint .meter-fill {
+      background: linear-gradient(90deg, #6d9f7a, #c9aa62);
+    }
+
+    .state-flicker {
+      --vignette: rgba(0, 0, 0, 0.68);
+      --blur-opacity: 0;
+    }
+
+    .state-flicker .map-shell::before {
+      opacity: 0.9;
+      animation: vignetteBlink 1.6s ease-in-out infinite;
+    }
+
+    .state-flicker .meter-fill {
+      background: linear-gradient(90deg, #d7a053, #d96f56);
+    }
+
+    .state-final {
+      --vignette: rgba(0, 0, 0, 0.78);
+      --blur-opacity: 0.42;
+    }
+
+    .state-final .map-shell::before {
+      opacity: 1;
+      animation: vignetteBlink 950ms ease-in-out infinite;
+    }
+
+    .state-final .meter-fill {
+      background: linear-gradient(90deg, #984943, #d75f53);
+    }
+
+    .state-extinct {
+      --vignette: rgba(0, 0, 0, 0.92);
+      --blur-opacity: 0.72;
+    }
+
+    .state-extinct .map-shell::before {
+      opacity: 1;
+    }
+
+    .state-extinct .meter-fill {
+      background: #6f2f2f;
+    }
+
+    .gallery-button,
+    .audio-button,
+    .icon-button {
+      min-height: 44px;
+      border: 1px solid rgba(231, 189, 91, 0.2);
+      border-radius: 8px;
+      color: var(--text);
+      background: linear-gradient(135deg, rgba(34, 31, 25, 0.9), rgba(15, 16, 18, 0.86));
+      box-shadow: var(--shadow);
+      cursor: pointer;
+      transition: transform 160ms ease, border-color 160ms ease, background 160ms ease;
+    }
+
+    .top-actions {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .gallery-button,
+    .audio-button {
+      display: inline-flex;
+      align-items: center;
+      gap: 9px;
+      padding: 0 14px;
+      white-space: nowrap;
+    }
+
+    .gallery-button:hover,
+    .audio-button:hover,
+    .icon-button:hover {
+      transform: translateY(-1px);
+      border-color: rgba(231, 189, 91, 0.48);
+      background: rgba(36, 36, 38, 0.9);
+    }
+
+    .audio-button.active {
+      color: #17140e;
+      background: var(--gold);
+      border-color: rgba(255, 230, 142, 0.8);
+    }
+
+    .map-title {
+      position: absolute;
+      left: 24px;
+      bottom: 24px;
+      z-index: 4;
+      max-width: 360px;
+      padding: 16px;
+      border-left: 3px solid var(--gold);
+      background: linear-gradient(90deg, rgba(18, 19, 22, 0.82), rgba(18, 19, 22, 0.26));
+    }
+
+    .map-title h1 {
+      margin: 0 0 8px;
+      font-size: clamp(26px, 4vw, 48px);
+      line-height: 1.02;
+      letter-spacing: 0;
+    }
+
+    .map-title p {
+      margin: 0;
+      color: var(--muted);
+      line-height: 1.6;
+      font-size: 14px;
+    }
+
+    .pin-layer {
+      position: absolute;
+      inset: 0;
+      z-index: 3;
+    }
+
+    .episode-pin {
+      position: absolute;
+      left: var(--x);
+      top: var(--y);
+      width: 124px;
+      min-height: 150px;
+      border: 0;
+      padding: 0;
+      background: transparent;
+      color: var(--text);
+      cursor: pointer;
+      transform: translate(-50%, -50%);
+      transition: transform 180ms ease, filter 180ms ease, opacity 180ms ease;
+      animation: stickerIdle 4.6s ease-in-out infinite;
+      animation-delay: var(--delay);
+    }
+
+    .episode-pin:hover {
+      transform: translate(-50%, -54%) scale(1.04);
+      z-index: 4;
+    }
+
+    .sticker {
+      position: relative;
+      display: grid;
+      place-items: center;
+      width: 106px;
+      height: 106px;
+      margin: 0 auto 8px;
+      color: #070707;
+      background: #f2f0e8;
+      clip-path: polygon(48% 0%, 58% 5%, 70% 3%, 78% 11%, 90% 14%, 94% 26%, 100% 36%, 96% 49%, 99% 61%, 90% 70%, 87% 84%, 73% 87%, 63% 97%, 50% 94%, 38% 100%, 28% 91%, 15% 88%, 10% 75%, 0% 67%, 5% 54%, 1% 42%, 9% 32%, 12% 18%, 26% 14%, 36% 4%);
+      filter: drop-shadow(0 16px 20px rgba(0, 0, 0, 0.42));
+      transform: rotate(var(--tilt));
+      transition: transform 180ms ease;
+    }
+
+    .episode-pin:hover .sticker {
+      transform: rotate(calc(var(--tilt) * 0.55));
+    }
+
+    .sticker::before {
+      content: "";
+      position: absolute;
+      inset: 9px;
+      background:
+        radial-gradient(circle, rgba(0, 0, 0, 0.18) 0 1px, transparent 1.5px),
+        linear-gradient(135deg, rgba(255, 255, 255, 0.5), transparent 48%);
+      background-size: 7px 7px, 100% 100%;
+      mix-blend-mode: multiply;
+      opacity: 0.52;
+      clip-path: inherit;
+      pointer-events: none;
+    }
+
+    .doodle {
+      position: relative;
+      z-index: 1;
+      width: 76px;
+      height: 76px;
+      display: block;
+      filter: contrast(1.25);
+    }
+
+    .cost-tag {
+      position: absolute;
+      left: 50%;
+      bottom: 36px;
+      z-index: 2;
+      padding: 2px 7px;
+      border: 1px solid rgba(7, 7, 7, 0.72);
+      border-radius: 999px;
+      color: #070707;
+      background: rgba(242, 240, 232, 0.88);
+      font-size: 11px;
+      font-weight: 900;
+      transform: translateX(-50%) rotate(-4deg);
+    }
+
+    .episode-pin.available .sticker {
+      animation: availableGlow 1300ms ease-in-out infinite alternate;
+    }
+
+    .episode-pin.available::before {
+      content: "";
+      position: absolute;
+      left: 50%;
+      top: 53px;
+      width: 132px;
+      height: 132px;
+      border: 3px solid rgba(231, 189, 91, 0.72);
+      border-radius: 50%;
+      background: radial-gradient(circle, rgba(231, 189, 91, 0.24), transparent 64%);
+      transform: translate(-50%, -50%) scale(0.55);
+      animation: haloPulse 1500ms ease-in-out infinite;
+      pointer-events: none;
+    }
+
+    .episode-pin.insufficient,
+    .episode-pin.locked {
+      cursor: not-allowed;
+      filter: grayscale(1) brightness(0.62) contrast(0.95);
+      opacity: 0.76;
+      animation: none;
+    }
+
+    .episode-pin.insufficient .sticker,
+    .episode-pin.locked .sticker {
+      background: #c9c8c0;
+    }
+
+    .episode-pin.cleared .sticker {
+      background: #fbf8ef;
+      filter: drop-shadow(0 16px 20px rgba(0, 0, 0, 0.42)) saturate(1.12);
+    }
+
+    .ticket-stamp {
+      position: absolute;
+      left: 50%;
+      top: 48%;
+      z-index: 3;
+      display: grid;
+      place-items: center;
+      width: 98px;
+      height: 38px;
+      color: #3c1d14;
+      background:
+        radial-gradient(circle at 0 50%, transparent 0 9px, #e9b93e 10px),
+        radial-gradient(circle at 100% 50%, transparent 0 9px, #e9b93e 10px);
+      border-top: 2px solid #a73726;
+      border-bottom: 2px solid #a73726;
+      box-shadow: inset 12px 0 0 rgba(167, 55, 38, 0.08), inset -12px 0 0 rgba(167, 55, 38, 0.08), 0 4px 10px rgba(0, 0, 0, 0.22);
+      font-size: 14px;
+      font-weight: 900;
+      letter-spacing: 0;
+      transform: translate(-50%, -50%) rotate(-8deg);
+    }
+
+    .ticket-stamp::before,
+    .ticket-stamp::after {
+      content: "";
+      position: absolute;
+      top: 4px;
+      bottom: 4px;
+      width: 2px;
+      background: #a73726;
+      opacity: 0.82;
+    }
+
+    .ticket-stamp::before {
+      left: 16px;
+    }
+
+    .ticket-stamp::after {
+      right: 16px;
+    }
+
+    .tooltip {
+      position: absolute;
+      left: 50%;
+      bottom: calc(100% + 10px);
+      min-width: 168px;
+      padding: 10px 12px;
+      border: 1px solid rgba(244, 239, 230, 0.18);
+      border-radius: 8px;
+      background: rgba(14, 15, 18, 0.94);
+      box-shadow: var(--shadow);
+      color: var(--text);
+      text-align: left;
+      pointer-events: none;
+      opacity: 0;
+      transform: translateX(-50%) translateY(5px);
+      transition: opacity 140ms ease, transform 140ms ease;
+    }
+
+    .tooltip strong {
+      display: block;
+      margin-bottom: 5px;
+      font-size: 14px;
+    }
+
+    .tooltip span {
+      display: block;
+      color: var(--muted);
+      font-size: 12px;
+      line-height: 1.5;
+    }
+
+    .episode-pin:hover .tooltip,
+    .episode-pin:focus-visible .tooltip {
+      opacity: 1;
+      transform: translateX(-50%) translateY(0);
+    }
+
+    .side-panel {
+      position: absolute;
+      right: 22px;
+      bottom: 22px;
+      z-index: 6;
+      width: min(340px, calc(100vw - 44px));
+      padding: 16px;
+      border-radius: 8px;
+    }
+
+    .side-panel h2 {
+      margin: 0 0 12px;
+      font-size: 17px;
+      letter-spacing: 0;
+    }
+
+    .controls {
+      display: grid;
+      gap: 12px;
+      margin-bottom: 16px;
+    }
+
+    .control-row {
+      display: grid;
+      grid-template-columns: 1fr auto;
+      gap: 12px;
+      align-items: center;
+    }
+
+    input[type="range"] {
+      width: 100%;
+      accent-color: var(--gold);
+    }
+
+    .icon-button {
+      display: grid;
+      place-items: center;
+      width: 44px;
+      height: 44px;
+      padding: 0;
+    }
+
+    .legend {
+      position: absolute;
+      left: 22px;
+      top: 94px;
+      z-index: 5;
+      display: grid;
+      gap: 9px;
+      width: 202px;
+      padding: 12px;
+      border-radius: 8px;
+      color: var(--muted);
+      font-size: 12px;
+    }
+
+    .legend-item {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .legend-dot {
+      width: 12px;
+      height: 12px;
+      border-radius: 50%;
+      border: 2px solid currentColor;
+      flex: 0 0 auto;
+    }
+
+    .legend-item:nth-child(1) { color: #8a8a8a; }
+    .legend-item:nth-child(2) { color: var(--gold); }
+    .legend-item:nth-child(3) { color: var(--red); }
+    .legend-item:nth-child(4) { color: var(--green); }
+
+    .progress-list {
+      display: grid;
+      gap: 8px;
+      margin: 0;
+      padding: 0;
+      list-style: none;
+    }
+
+    .progress-list li {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      min-height: 34px;
+      padding: 7px 9px;
+      border: 1px solid rgba(244, 239, 230, 0.1);
+      border-radius: 7px;
+      background: rgba(244, 239, 230, 0.04);
+      font-size: 12px;
+    }
+
+    .status-chip {
+      color: var(--muted);
+      white-space: nowrap;
+    }
+
+    .modal {
+      position: fixed;
+      inset: 0;
+      z-index: 20;
+      display: none;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+      background: rgba(0, 0, 0, 0.58);
+    }
+
+    .modal.open {
+      display: flex;
+      animation: modalFade 170ms ease-out both;
+    }
+
+    .modal-card {
+      width: min(390px, 100%);
+      padding: 22px;
+      border: 1px solid rgba(244, 239, 230, 0.18);
+      border-radius: 8px;
+      background: var(--panel-strong);
+      box-shadow: var(--shadow);
+      transform-origin: center;
+    }
+
+    .modal.open .modal-card {
+      animation: modalPop 260ms cubic-bezier(.2, .9, .2, 1.15) both;
+    }
+
+    .modal.shake .modal-card {
+      animation: modalPop 260ms cubic-bezier(.2, .9, .2, 1.15) both, noticeShake 360ms steps(2, end) 80ms both;
+    }
+
+    .modal-card h3 {
+      margin: 0 0 9px;
+      font-size: 22px;
+    }
+
+    .modal-card p {
+      margin: 0 0 18px;
+      color: var(--muted);
+      line-height: 1.6;
+    }
+
+    .primary-button {
+      width: 100%;
+      min-height: 44px;
+      border: 0;
+      border-radius: 8px;
+      color: #17140e;
+      background: var(--gold);
+      font-weight: 800;
+      cursor: pointer;
+    }
+
+    .game-over {
+      position: absolute;
+      left: 50%;
+      top: 50%;
+      z-index: 7;
+      display: none;
+      width: min(450px, calc(100vw - 44px));
+      padding: 22px;
+      border: 1px solid rgba(215, 95, 83, 0.48);
+      border-radius: 8px;
+      background: rgba(36, 16, 16, 0.9);
+      box-shadow: var(--shadow);
+      text-align: center;
+      transform: translate(-50%, -50%);
+    }
+
+    .game-over.visible {
+      display: block;
+    }
+
+    .game-over h2 {
+      margin: 0 0 8px;
+      color: #ffb7ad;
+      font-size: 28px;
+    }
+
+    .game-over p {
+      margin: 0;
+      color: #ead1ca;
+      line-height: 1.6;
+    }
+
+    @keyframes stickerIdle {
+      0%, 100% { translate: 0 0; }
+      50% { translate: 0 -5px; }
+    }
+
+    @keyframes availableGlow {
+      from {
+        filter: drop-shadow(0 16px 20px rgba(0, 0, 0, 0.42)) drop-shadow(0 0 0 rgba(231, 189, 91, 0));
+      }
+      to {
+        filter: drop-shadow(0 16px 20px rgba(0, 0, 0, 0.42)) drop-shadow(0 0 20px rgba(231, 189, 91, 0.82));
+      }
+    }
+
+    @keyframes haloPulse {
+      0% { opacity: 0.82; transform: translate(-50%, -50%) scale(0.45); }
+      70% { opacity: 0.22; }
+      100% { opacity: 0; transform: translate(-50%, -50%) scale(1.55); }
+    }
+
+    @keyframes vignetteBlink {
+      0%, 100% { filter: brightness(1); }
+      45% { filter: brightness(0.76); }
+      68% { filter: brightness(1.08); }
+    }
+
+    @keyframes screenShake {
+      0%, 100% { transform: translate3d(0, 0, 0); }
+      20% { transform: translate3d(-3px, 2px, 0); }
+      40% { transform: translate3d(3px, -1px, 0); }
+      60% { transform: translate3d(-2px, -2px, 0); }
+      80% { transform: translate3d(2px, 2px, 0); }
+    }
+
+    @keyframes noticeShake {
+      0%, 100% { transform: translate3d(0, 0, 0) scale(1); }
+      20% { transform: translate3d(-8px, 1px, 0) scale(1); }
+      40% { transform: translate3d(7px, -1px, 0) scale(1); }
+      60% { transform: translate3d(-5px, 0, 0) scale(1); }
+      80% { transform: translate3d(4px, 1px, 0) scale(1); }
+    }
+
+    @keyframes blurDrift {
+      0%, 100% { transform: translate3d(-4%, 0, 0); }
+      50% { transform: translate3d(5%, 2%, 0); }
+    }
+
+    @keyframes modalFade {
+      from { background: rgba(0, 0, 0, 0); }
+      to { background: rgba(0, 0, 0, 0.58); }
+    }
+
+    @keyframes modalPop {
+      from { opacity: 0; transform: translateY(18px) scale(0.94); }
+      to { opacity: 1; transform: translateY(0) scale(1); }
+    }
+
+    @media (max-width: 820px) {
+      body {
+        overflow: auto;
+      }
+
+      .map-shell {
+        min-height: 1240px;
+      }
+
+      .topbar {
+        align-items: stretch;
+        flex-direction: column;
+      }
+
+      .divinity-panel {
+        min-width: 0;
+        width: 100%;
+      }
+
+      .gallery-button {
+        justify-content: center;
+      }
+
+      .top-actions {
+        width: 100%;
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+      }
+
+      .gallery-button,
+      .audio-button {
+        justify-content: center;
+        width: 100%;
+      }
+
+      .legend {
+        left: 22px;
+        right: 22px;
+        top: 158px;
+        width: auto;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+      }
+
+      .pin-layer {
+        inset: 210px 0 0;
+      }
+
+      .map-world {
+        left: -760px;
+        top: -420px;
+        width: 2100px;
+        height: 2100px;
+        min-width: 2100px;
+        min-height: 2100px;
+      }
+
+      .episode-pin {
+        width: 96px;
+      }
+
+      .sticker {
+        width: 84px;
+        height: 84px;
+      }
+
+      .doodle {
+        width: 62px;
+        height: 62px;
+      }
+
+      .cost-tag {
+        bottom: 32px;
+        font-size: 10px;
+      }
+
+      .tooltip {
+        min-width: 150px;
+      }
+
+      .side-panel {
+        position: relative;
+        right: auto;
+        bottom: auto;
+        width: calc(100% - 44px);
+        margin: 730px 22px 22px;
+      }
+
+      .map-title {
+        left: 22px;
+        right: 22px;
+        top: 690px;
+        bottom: auto;
+        max-width: none;
+      }
+    }
+  </style>
+</head>
+<body class="state-normal">
+  <main class="map-shell" aria-label="도시 지도 허브 화면">
+    <div class="map-viewport" id="mapViewport" aria-label="드래그 가능한 도시 지도">
+      <div class="map-world" id="mapWorld">
+        <div class="city-map" aria-hidden="true">
+          <div class="district" data-zone="N-01"></div>
+          <div class="district" data-zone="C-02"></div>
+          <div class="district" data-zone="E-03"></div>
+          <div class="district" data-zone="W-04"></div>
+          <div class="district" data-zone="S-05"></div>
+          <div class="district" data-zone="R-06"></div>
+        </div>
+
+        <section class="pin-layer" id="pinLayer" aria-label="회차 진입 버튼"></section>
+      </div>
+    </div>
+
+    <header class="topbar">
+      <section class="divinity-panel" aria-label="현재 신성">
+        <div class="divinity-orb" aria-hidden="true">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
+            <path d="M12 2l2.6 6.2L21 9l-4.8 4.2 1.5 6.4L12 16.2 6.3 19.6l1.5-6.4L3 9l6.4-.8L12 2z" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/>
+          </svg>
+        </div>
+        <div class="divinity-main">
+          <div class="divinity-row">
+            <span class="label">신성</span>
+            <strong class="value"><span id="divinityValue">72</span>/100</strong>
+            <span class="music-state" id="musicState">정상</span>
+          </div>
+          <div class="meter" aria-hidden="true">
+            <div class="meter-fill"></div>
+          </div>
+        </div>
+      </section>
+
+      <div class="top-actions">
+        <button class="audio-button" type="button" id="audioButton" aria-label="BGM 켜기" aria-pressed="false">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+            <path d="M4 14V10h4l5-4v12l-5-4H4z" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/>
+            <path d="M16 9c1.2 1.2 1.2 4.8 0 6" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
+          </svg>
+          BGM
+        </button>
+        <button class="gallery-button" type="button" id="galleryButton" aria-label="갤러리 바로가기">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+            <rect x="3" y="5" width="18" height="14" rx="2" stroke="currentColor" stroke-width="1.8"/>
+            <path d="M7 15l3-3 3 3 2-2 3 3" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+            <circle cx="8" cy="9" r="1.3" fill="currentColor"/>
+          </svg>
+          갤러리
+        </button>
+      </div>
+    </header>
+
+    <aside class="legend" aria-label="회차 상태 범례">
+      <div class="legend-item"><span class="legend-dot"></span>미해금</div>
+      <div class="legend-item"><span class="legend-dot"></span>진입 가능</div>
+      <div class="legend-item"><span class="legend-dot"></span>신성 부족</div>
+      <div class="legend-item"><span class="legend-dot"></span>클리어</div>
+    </aside>
+
+    <section class="map-title">
+      <h1>맵 시스템 개발 툴</h1>
+      <p>이 웹페이지는 Sucream의 공식 맵 시스템 개발도구입니다. 화면 구성, 문구, 로고 및 관련 리소스의 저작권은 Sucream에 있으며, 팀 내부 기획·개발 검토 목적 외 무단 복제, 배포, 상업적 이용을 금지합니다.</p>
+    </section>
+
+    <aside class="side-panel" aria-label="프로토타입 조작 패널">
+      <h2>프로토타입 조작</h2>
+      <div class="controls">
+        <label class="label" for="divinityRange">신성 수치 조절</label>
+        <div class="control-row">
+          <input id="divinityRange" type="range" min="0" max="100" value="72">
+          <button class="icon-button" type="button" id="resetButton" aria-label="상태 초기화" title="상태 초기화">
+            <svg width="21" height="21" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+              <path d="M4 12a8 8 0 1 0 2.3-5.7L4 8.6" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+              <path d="M4 4v4.6h4.6" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+          </button>
+        </div>
+      </div>
+      <ul class="progress-list" id="progressList"></ul>
+    </aside>
+
+    <section class="game-over" id="gameOver" aria-live="polite">
+      <h2>GAME OVER</h2>
+      <p>신성이 0%에 도달해 소멸했습니다.</p>
+    </section>
+  </main>
+
+  <div class="modal" id="modal" role="dialog" aria-modal="true" aria-labelledby="modalTitle">
+    <div class="modal-card">
+      <h3 id="modalTitle">알림</h3>
+      <p id="modalText"></p>
+      <button class="primary-button" type="button" id="modalClose">확인</button>
+    </div>
+  </div>
+
+  <script>
+    const initialEpisodes = [
+      { id: "a", name: "A", cost: 18, x: "25%", y: "31%", tilt: "-8deg", delay: "0ms", unlocked: true, cleared: false, result: "", doodle: "record" },
+      { id: "b", name: "B", cost: 34, x: "48%", y: "24%", tilt: "6deg", delay: "-700ms", unlocked: true, cleared: true, result: "완료", doodle: "clover" },
+      { id: "c", name: "C", cost: 42, x: "66%", y: "23%", tilt: "-3deg", delay: "-1200ms", unlocked: true, cleared: false, result: "", doodle: "dice" },
+      { id: "d", name: "D", cost: 58, x: "34%", y: "62%", tilt: "5deg", delay: "-400ms", unlocked: true, cleared: false, result: "", doodle: "key" },
+      { id: "e", name: "E", cost: 76, x: "59%", y: "60%", tilt: "-7deg", delay: "-900ms", unlocked: false, cleared: false, result: "", doodle: "eye" },
+      { id: "f", name: "F", cost: 88, x: "64%", y: "72%", tilt: "7deg", delay: "-1500ms", unlocked: false, cleared: false, result: "", doodle: "tower" }
+    ];
+
+    let episodes = structuredClone(initialEpisodes);
+    let divinity = 72;
+
+    const body = document.body;
+    const root = document.documentElement;
+    const mapViewport = document.getElementById("mapViewport");
+    const mapWorld = document.getElementById("mapWorld");
+    const pinLayer = document.getElementById("pinLayer");
+    const progressList = document.getElementById("progressList");
+    const divinityValue = document.getElementById("divinityValue");
+    const divinityRange = document.getElementById("divinityRange");
+    const musicState = document.getElementById("musicState");
+    const gameOver = document.getElementById("gameOver");
+    const modal = document.getElementById("modal");
+    const modalTitle = document.getElementById("modalTitle");
+    const modalText = document.getElementById("modalText");
+    const audioButton = document.getElementById("audioButton");
+    const mapPan = { x: 0, y: 0, startX: 0, startY: 0, originX: 0, originY: 0, active: false };
+    let audio = null;
+    let gameOverAnnounced = false;
+
+    function getEpisodeStatus(episode) {
+      if (!episode.unlocked) return "locked";
+      if (episode.cleared) return "cleared";
+      if (divinity < episode.cost) return "insufficient";
+      return "available";
+    }
+
+    function getMusicState(value) {
+      if (value <= 0) return { className: "state-extinct", text: "소멸" };
+      if (value <= 10) return { className: "state-final", text: "소멸 직전" };
+      if (value <= 30) return { className: "state-flicker", text: "점멸" };
+      if (value <= 50) return { className: "state-faint", text: "희미" };
+      return { className: "state-normal", text: "정상" };
+    }
+
+    function getStatusText(status, episode) {
+      if (status === "locked") return "미해금";
+      if (status === "cleared") return "완료";
+      if (status === "insufficient") return "신성 부족";
+      return "진입 가능";
+    }
+
+    function getDoodle(type) {
+      const common = `class="doodle" viewBox="0 0 100 100" fill="none" aria-hidden="true"`;
+      const texture = `
+        <defs>
+          <pattern id="dots-${type}" width="6" height="6" patternUnits="userSpaceOnUse">
+            <circle cx="1.3" cy="1.3" r="1.05" fill="currentColor"/>
+          </pattern>
+        </defs>
+      `;
+      const doodles = {
+        record: `
+          <svg ${common}>
+            ${texture}
+            <circle cx="50" cy="50" r="36" fill="currentColor"/>
+            <circle cx="50" cy="50" r="15" fill="#f2f0e8"/>
+            <circle cx="50" cy="50" r="5" fill="currentColor"/>
+            <path d="M24 40c18-9 38-9 55-1M20 55c20 8 43 9 61 0" stroke="#f2f0e8" stroke-width="3" opacity=".5"/>
+            <circle cx="50" cy="50" r="34" fill="url(#dots-record)" opacity=".18"/>
+          </svg>
+        `,
+        clover: `
+          <svg ${common}>
+            ${texture}
+            <path d="M48 47C33 29 55 13 65 32c12-14 34 3 18 21 19 7 7 35-13 25-2 20-33 20-31-1-19 10-32-16-14-25-16-17 6-35 23-5z" fill="currentColor"/>
+            <path d="M50 49c1 16-1 29-14 39" stroke="currentColor" stroke-width="8" stroke-linecap="round"/>
+            <path d="M37 40c8 7 18 8 26 0M38 63c8-5 18-5 27 0" stroke="#f2f0e8" stroke-width="4" opacity=".48"/>
+            <path d="M22 24h60v60H22z" fill="url(#dots-clover)" opacity=".25"/>
+          </svg>
+        `,
+        dice: `
+          <svg ${common}>
+            ${texture}
+            <path d="M21 31l33-17 31 19-4 39-33 15-32-20 5-36z" fill="#f2f0e8" stroke="currentColor" stroke-width="7" stroke-linejoin="round"/>
+            <path d="M22 32l29 17 34-16M51 49l-3 37" stroke="currentColor" stroke-width="5" stroke-linejoin="round"/>
+            <circle cx="38" cy="34" r="5" fill="currentColor"/><circle cx="58" cy="29" r="5" fill="currentColor"/><circle cx="69" cy="43" r="5" fill="currentColor"/>
+            <circle cx="34" cy="58" r="5" fill="currentColor"/><circle cx="61" cy="60" r="5" fill="currentColor"/><circle cx="73" cy="69" r="5" fill="currentColor"/>
+            <path d="M18 26h66v56H18z" fill="url(#dots-dice)" opacity=".16"/>
+          </svg>
+        `,
+        key: `
+          <svg ${common}>
+            ${texture}
+            <circle cx="35" cy="39" r="19" stroke="currentColor" stroke-width="10"/>
+            <circle cx="35" cy="39" r="6" fill="currentColor"/>
+            <path d="M50 52l31 31M65 67l9-9M73 75l9-9" stroke="currentColor" stroke-width="10" stroke-linecap="round" stroke-linejoin="round"/>
+            <path d="M20 22h62v62H20z" fill="url(#dots-key)" opacity=".2"/>
+          </svg>
+        `,
+        eye: `
+          <svg ${common}>
+            ${texture}
+            <path d="M12 52c12-20 25-29 39-29s28 10 39 29C77 70 64 78 50 78S24 69 12 52z" fill="currentColor"/>
+            <circle cx="50" cy="52" r="18" fill="#f2f0e8"/>
+            <circle cx="50" cy="52" r="8" fill="currentColor"/>
+            <path d="M20 49c17 8 41 8 60 0" stroke="#f2f0e8" stroke-width="4" opacity=".42"/>
+            <path d="M12 18h76v68H12z" fill="url(#dots-eye)" opacity=".2"/>
+          </svg>
+        `,
+        tower: `
+          <svg ${common}>
+            ${texture}
+            <path d="M33 86h34l-5-53H38l-5 53z" fill="currentColor"/>
+            <path d="M31 32h38l-7-15H38l-7 15zM27 87h46" stroke="currentColor" stroke-width="8" stroke-linecap="round" stroke-linejoin="round"/>
+            <path d="M43 44h14M42 58h16M41 72h18" stroke="#f2f0e8" stroke-width="5" opacity=".58"/>
+            <path d="M25 16h50v70H25z" fill="url(#dots-tower)" opacity=".2"/>
+          </svg>
+        `
+      };
+      return doodles[type] || doodles.record;
+    }
+
+    function showModal(title, text, options = {}) {
+      modalTitle.textContent = title;
+      modalText.textContent = text;
+      modal.classList.remove("shake");
+      modal.classList.add("open");
+      if (options.shake) {
+        requestAnimationFrame(() => modal.classList.add("shake"));
+      }
+      playSfx("modal");
+    }
+
+    function createAudio() {
+      const AudioContext = window.AudioContext || window.webkitAudioContext;
+      if (!AudioContext) return null;
+
+      const context = new AudioContext();
+      const master = context.createGain();
+      const musicGain = context.createGain();
+      const dryGain = context.createGain();
+      const delay = context.createDelay(1.2);
+      const delayGain = context.createGain();
+      const filter = context.createBiquadFilter();
+      const oscillators = [55, 82.41, 110].map((frequency, index) => {
+        const oscillator = context.createOscillator();
+        const gain = context.createGain();
+        oscillator.type = index === 0 ? "sine" : "triangle";
+        oscillator.frequency.value = frequency;
+        gain.gain.value = index === 0 ? 0.09 : 0.035;
+        oscillator.connect(gain);
+        gain.connect(filter);
+        oscillator.start();
+        return { oscillator, base: frequency };
+      });
+
+      filter.type = "lowpass";
+      filter.frequency.value = 1100;
+      filter.Q.value = 0.7;
+      filter.connect(dryGain);
+      filter.connect(delay);
+      delay.connect(delayGain);
+      delayGain.connect(dryGain);
+      dryGain.connect(musicGain);
+      musicGain.connect(master);
+      master.connect(context.destination);
+
+      master.gain.value = 0.58;
+      musicGain.gain.value = 0.28;
+      delay.delayTime.value = 0.28;
+      delayGain.gain.value = 0.02;
+
+      const engine = {
+        context,
+        master,
+        musicGain,
+        delay,
+        delayGain,
+        filter,
+        oscillators,
+        enabled: true,
+        pulseTimer: null,
+        pulseInterval: 1050
+      };
+      window.__mapAudioDebug = engine;
+      startPulse(engine);
+      return engine;
+    }
+
+    function startPulse(engine) {
+      if (engine.pulseTimer) clearInterval(engine.pulseTimer);
+      engine.pulseTimer = setInterval(() => {
+        if (!engine.enabled || engine.context.state !== "running") return;
+        playSfx("pulse", 0.22);
+      }, engine.pulseInterval);
+    }
+
+    function ensureAudio() {
+      if (!audio) audio = createAudio();
+      if (!audio) return;
+      audio.context.resume();
+      audio.enabled = true;
+      audioButton.setAttribute("aria-pressed", "true");
+      audioButton.setAttribute("aria-label", "BGM 끄기");
+      audioButton.classList.add("active");
+      updateAudioForState();
+    }
+
+    function toggleAudio() {
+      if (!audio || !audio.enabled) {
+        ensureAudio();
+        playSfx("confirm");
+        return;
+      }
+      audio.enabled = false;
+      audio.master.gain.setTargetAtTime(0, audio.context.currentTime, 0.08);
+      audioButton.setAttribute("aria-pressed", "false");
+      audioButton.setAttribute("aria-label", "BGM 켜기");
+      audioButton.classList.remove("active");
+    }
+
+    function playSfx(type, scale = 1) {
+      if (!audio || !audio.enabled || audio.context.state !== "running") return;
+      const context = audio.context;
+      const oscillator = context.createOscillator();
+      const gain = context.createGain();
+      const now = context.currentTime;
+      const config = {
+        confirm: { type: "triangle", start: 520, end: 740, gain: 0.08, duration: 0.16 },
+        modal: { type: "sine", start: 330, end: 495, gain: 0.055, duration: 0.18 },
+        error: { type: "sawtooth", start: 150, end: 92, gain: 0.075, duration: 0.22 },
+        enter: { type: "triangle", start: 390, end: 660, gain: 0.07, duration: 0.24 },
+        pulse: { type: "sine", start: 110, end: 82, gain: 0.032, duration: 0.18 },
+        gameover: { type: "sawtooth", start: 92, end: 38, gain: 0.11, duration: 0.8 }
+      }[type] || { type: "sine", start: 260, end: 260, gain: 0.04, duration: 0.12 };
+
+      oscillator.type = config.type;
+      oscillator.frequency.setValueAtTime(config.start, now);
+      oscillator.frequency.exponentialRampToValueAtTime(Math.max(20, config.end), now + config.duration);
+      gain.gain.setValueAtTime(0.0001, now);
+      gain.gain.exponentialRampToValueAtTime(config.gain * scale, now + 0.02);
+      gain.gain.exponentialRampToValueAtTime(0.0001, now + config.duration);
+      oscillator.connect(gain);
+      gain.connect(audio.master);
+      oscillator.start(now);
+      oscillator.stop(now + config.duration + 0.04);
+    }
+
+    function updateAudioForState() {
+      if (!audio || !audio.enabled) return;
+      const now = audio.context.currentTime;
+      const state = getMusicState(divinity).className;
+      const settings = {
+        "state-normal": { volume: 0.28, echo: 0.02, delay: 0.26, filter: 1200, rate: 1050, pitch: 1 },
+        "state-faint": { volume: 0.26, echo: 0.18, delay: 0.42, filter: 920, rate: 1150, pitch: 0.96 },
+        "state-flicker": { volume: 0.23, echo: 0.16, delay: 0.5, filter: 720, rate: 1600, pitch: 0.82 },
+        "state-final": { volume: 0, echo: 0, delay: 0.58, filter: 420, rate: 2200, pitch: 0.62 },
+        "state-extinct": { volume: 0, echo: 0, delay: 0.2, filter: 240, rate: 2600, pitch: 0.5 }
+      }[state];
+
+      audio.master.gain.setTargetAtTime(0.58, now, 0.08);
+      audio.musicGain.gain.setTargetAtTime(settings.volume, now, 0.18);
+      audio.delayGain.gain.setTargetAtTime(settings.echo, now, 0.14);
+      audio.delay.delayTime.setTargetAtTime(settings.delay, now, 0.14);
+      audio.filter.frequency.setTargetAtTime(settings.filter, now, 0.14);
+      audio.oscillators.forEach(({ oscillator, base }) => {
+        oscillator.frequency.setTargetAtTime(base * settings.pitch, now, 0.24);
+      });
+      if (audio.pulseInterval !== settings.rate) {
+        audio.pulseInterval = settings.rate;
+        startPulse(audio);
+      }
+    }
+
+    function handleEpisodeClick(episode) {
+      const status = getEpisodeStatus(episode);
+      if (status === "locked") {
+        playSfx("error");
+        showModal("미해금 회차", "선행 회차를 클리어하면 이 인물의 회차가 지도에 나타납니다.");
+        return;
+      }
+      if (status === "insufficient") {
+        playSfx("error");
+        showModal("신성 부족", `${episode.name} 회차 진입에는 신성 ${episode.cost}이 필요합니다.`, { shake: true });
+        return;
+      }
+      if (status === "cleared") {
+        playSfx("confirm");
+        showModal("클리어 기록", `${episode.name} 회차는 완료되었습니다. 재플레이로 다시 진입할 수 있습니다.`);
+        return;
+      }
+
+      playSfx("enter");
+      divinity = Math.max(0, divinity - episode.cost);
+      episode.cleared = true;
+      episode.result = "완료";
+
+      const nextLocked = episodes.find((item) => !item.unlocked);
+      if (nextLocked) nextLocked.unlocked = true;
+
+      divinityRange.value = divinity;
+      showModal("회차 클리어", `${episode.name} 회차를 클리어했습니다. 다음 인물 회차가 새로 등장했습니다.`);
+      render();
+    }
+
+    function renderPins() {
+      pinLayer.innerHTML = episodes.map((episode) => {
+        const status = getEpisodeStatus(episode);
+        const label = getStatusText(status, episode);
+        return `
+          <button class="episode-pin ${status}" type="button" style="--x:${episode.x}; --y:${episode.y}; --tilt:${episode.tilt}; --delay:${episode.delay}" data-id="${episode.id}" aria-label="${episode.name} ${label}">
+            <span class="tooltip">
+              <strong>${episode.name}</strong>
+              <span>진입 비용: 신성 ${episode.cost}</span>
+              <span>상태: ${label}</span>
+            </span>
+            <span class="sticker">
+              ${getDoodle(episode.doodle)}
+              <span class="cost-tag">신성 ${episode.cost}</span>
+              ${status === "cleared" ? `<span class="ticket-stamp">완료</span>` : ""}
+            </span>
+          </button>
+        `;
+      }).join("");
+
+      pinLayer.querySelectorAll(".episode-pin").forEach((button) => {
+        button.addEventListener("click", () => {
+          const episode = episodes.find((item) => item.id === button.dataset.id);
+          handleEpisodeClick(episode);
+        });
+      });
+    }
+
+    function renderProgress() {
+      progressList.innerHTML = episodes.map((episode) => {
+        const status = getEpisodeStatus(episode);
+        return `
+          <li>
+            <span>${episode.name}</span>
+            <span class="status-chip">${getStatusText(status, episode)} · ${episode.cost}</span>
+          </li>
+        `;
+      }).join("");
+    }
+
+    function renderDivinity() {
+      const state = getMusicState(divinity);
+      body.className = state.className;
+      divinityValue.textContent = divinity;
+      musicState.textContent = state.text;
+      root.style.setProperty("--divinity-width", `${divinity}%`);
+      updateAudioForState();
+    }
+
+    function renderGameOver() {
+      const extinct = divinity <= 0;
+      const visible = extinct;
+      gameOver.classList.toggle("visible", visible);
+      if (visible && !gameOverAnnounced) {
+        playSfx("gameover");
+        gameOverAnnounced = true;
+      }
+      if (!visible) gameOverAnnounced = false;
+    }
+
+    function clamp(value, min, max) {
+      return Math.min(max, Math.max(min, value));
+    }
+
+    function applyMapPan() {
+      root.style.setProperty("--map-x", `${mapPan.x}px`);
+      root.style.setProperty("--map-y", `${mapPan.y}px`);
+    }
+
+    mapViewport.addEventListener("pointerdown", (event) => {
+      if (event.target.closest("button, input, .side-panel, .topbar, .legend, .map-title, .modal")) return;
+      mapPan.active = true;
+      mapPan.startX = event.clientX;
+      mapPan.startY = event.clientY;
+      mapPan.originX = mapPan.x;
+      mapPan.originY = mapPan.y;
+      mapViewport.classList.add("is-panning");
+      mapViewport.setPointerCapture(event.pointerId);
+    });
+
+    mapViewport.addEventListener("pointermove", (event) => {
+      if (!mapPan.active) return;
+      mapPan.x = clamp(mapPan.originX + event.clientX - mapPan.startX, -280, 280);
+      mapPan.y = clamp(mapPan.originY + event.clientY - mapPan.startY, -220, 220);
+      applyMapPan();
+    });
+
+    function endMapPan(event) {
+      if (!mapPan.active) return;
+      mapPan.active = false;
+      mapViewport.classList.remove("is-panning");
+      if (mapViewport.hasPointerCapture(event.pointerId)) {
+        mapViewport.releasePointerCapture(event.pointerId);
+      }
+    }
+
+    mapViewport.addEventListener("pointerup", endMapPan);
+    mapViewport.addEventListener("pointercancel", endMapPan);
+
+    function render() {
+      renderDivinity();
+      renderPins();
+      renderProgress();
+      renderGameOver();
+    }
+
+    divinityRange.addEventListener("input", (event) => {
+      divinity = Number(event.target.value);
+      render();
+    });
+
+    document.getElementById("resetButton").addEventListener("click", () => {
+      episodes = structuredClone(initialEpisodes);
+      divinity = 72;
+      gameOverAnnounced = false;
+      divinityRange.value = divinity;
+      playSfx("confirm");
+      render();
+    });
+
+    audioButton.addEventListener("click", toggleAudio);
+
+    document.getElementById("galleryButton").addEventListener("click", () => {
+      playSfx("confirm");
+      showModal("갤러리", "임시 갤러리 바로가기입니다. 실제 구현에서는 수집한 클리어 이미지와 결과 기록으로 이동합니다.");
+    });
+
+    document.getElementById("modalClose").addEventListener("click", () => {
+      playSfx("confirm", 0.7);
+      modal.classList.remove("open");
+      modal.classList.remove("shake");
+    });
+
+    modal.addEventListener("click", (event) => {
+      if (event.target === modal) {
+        modal.classList.remove("open");
+        modal.classList.remove("shake");
+      }
+    });
+
+    window.addEventListener("keydown", (event) => {
+      if (event.key === "Escape") {
+        modal.classList.remove("open");
+        modal.classList.remove("shake");
+      }
+    });
+
+    render();
+  </script>
+</body>
+</html>

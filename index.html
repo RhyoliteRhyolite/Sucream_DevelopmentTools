@@ -1,0 +1,219 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Sucream System Prototypes</title>
+  <style>
+    :root {
+      --bg: #151615;
+      --panel: rgba(15, 16, 17, 0.78);
+      --line: rgba(238, 232, 218, 0.16);
+      --text: #f3eee5;
+      --muted: #b9b0a0;
+      --gold: #d7b35d;
+      --red: #c75d50;
+      --shadow: 0 24px 90px rgba(0, 0, 0, 0.55);
+      font-family: "Pretendard", "Apple SD Gothic Neo", "Noto Sans KR", system-ui, sans-serif;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      color: var(--text);
+      background:
+        radial-gradient(circle at 18% 12%, rgba(215, 179, 93, 0.14), transparent 28rem),
+        radial-gradient(circle at 76% 80%, rgba(199, 93, 80, 0.09), transparent 26rem),
+        linear-gradient(135deg, #242522, #111214 64%, #08090a);
+      overflow-x: hidden;
+    }
+
+    .shell {
+      min-height: 100vh;
+      display: grid;
+      grid-template-rows: auto 1fr auto;
+      padding: clamp(22px, 5vw, 56px);
+    }
+
+    header {
+      max-width: 1080px;
+      width: 100%;
+      margin: 0 auto;
+    }
+
+    .eyebrow {
+      margin: 0 0 12px;
+      color: var(--gold);
+      font-size: 13px;
+      font-weight: 800;
+      letter-spacing: 0;
+    }
+
+    h1 {
+      max-width: 760px;
+      margin: 0;
+      font-size: clamp(38px, 6vw, 76px);
+      line-height: 0.98;
+      letter-spacing: 0;
+    }
+
+    .lead {
+      max-width: 680px;
+      margin: 18px 0 0;
+      color: var(--muted);
+      font-size: clamp(15px, 2vw, 18px);
+      line-height: 1.7;
+    }
+
+    main {
+      width: 100%;
+      max-width: 1080px;
+      margin: 46px auto;
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 16px;
+      align-content: center;
+    }
+
+    .system-card {
+      min-height: 260px;
+      display: grid;
+      align-content: end;
+      gap: 18px;
+      padding: 22px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      color: var(--text);
+      text-decoration: none;
+      background:
+        linear-gradient(180deg, transparent 0%, rgba(0, 0, 0, 0.72) 100%),
+        var(--panel);
+      box-shadow: var(--shadow);
+      backdrop-filter: blur(14px);
+      transition: transform 180ms ease, border-color 180ms ease, background 180ms ease;
+    }
+
+    .system-card:hover {
+      transform: translateY(-4px);
+      border-color: rgba(215, 179, 93, 0.52);
+      background:
+        linear-gradient(180deg, rgba(215, 179, 93, 0.08), rgba(0, 0, 0, 0.76)),
+        var(--panel);
+    }
+
+    .system-card.disabled {
+      cursor: not-allowed;
+      filter: grayscale(0.8);
+      opacity: 0.72;
+    }
+
+    .system-card.disabled:hover {
+      transform: none;
+      border-color: var(--line);
+    }
+
+    .card-number {
+      color: var(--gold);
+      font-size: 13px;
+      font-weight: 900;
+    }
+
+    .card-title {
+      margin: 0;
+      font-size: 28px;
+      line-height: 1.2;
+    }
+
+    .card-copy {
+      margin: 0;
+      color: var(--muted);
+      line-height: 1.6;
+      font-size: 14px;
+    }
+
+    .card-status {
+      display: inline-flex;
+      width: fit-content;
+      min-height: 28px;
+      align-items: center;
+      padding: 0 10px;
+      border: 1px solid rgba(215, 179, 93, 0.3);
+      border-radius: 999px;
+      color: var(--gold);
+      font-size: 12px;
+      font-weight: 800;
+    }
+
+    .disabled .card-status {
+      border-color: rgba(199, 93, 80, 0.32);
+      color: #e0a098;
+    }
+
+    footer {
+      max-width: 1080px;
+      width: 100%;
+      margin: 0 auto;
+      color: rgba(243, 238, 229, 0.48);
+      font-size: 12px;
+      line-height: 1.6;
+    }
+
+    @media (max-width: 860px) {
+      main {
+        grid-template-columns: 1fr;
+      }
+
+      .system-card {
+        min-height: 190px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="shell">
+    <header>
+      <p class="eyebrow">SUCREAM DEVELOPMENT HUB</p>
+      <h1>시스템 프로토타입 허브</h1>
+      <p class="lead">맵 시스템, 대필 시스템, 비주얼 노벨 인게임 화면을 한 곳에서 확인하는 개발용 진입 페이지입니다.</p>
+    </header>
+
+    <main aria-label="프로토타입 선택">
+      <a class="system-card" href="map-system-prototype.html">
+        <span class="card-number">01</span>
+        <h2 class="card-title">맵 시스템</h2>
+        <p class="card-copy">도시 지도 허브, 신성 상태, 회차 버튼, 갤러리 진입을 확인합니다.</p>
+        <span class="card-status">Open</span>
+      </a>
+
+      <a class="system-card disabled" href="#" aria-disabled="true" id="ghostwritingCard">
+        <span class="card-number">02</span>
+        <h2 class="card-title">대필 시스템</h2>
+        <p class="card-copy">https://rhyoliterhyolite.github.io/Ghostwriting_SucreamDevelopmentTool/</p>
+        <span class="card-status">URL Needed</span>
+      </a>
+
+      <a class="system-card" href="visual-novel-prototype.html">
+        <span class="card-number">03</span>
+        <h2 class="card-title">비주얼 노벨</h2>
+        <p class="card-copy">대사창, 기능 메뉴, 선택지, 시간 제한 선택지 흐름을 확인합니다.</p>
+        <span class="card-status">Open</span>
+      </a>
+    </main>
+
+    <footer>
+      이 웹페이지는 Sucream의 공식 시스템 개발도구입니다. 팀 내부 기획·개발 검토 목적 외 무단 복제, 배포, 상업적 이용을 금지합니다.
+    </footer>
+  </div>
+
+  <script>
+    document.getElementById("ghostwritingCard").addEventListener("click", (event) => {
+      event.preventDefault();
+      alert("대필 시스템 GitHub Pages URL을 연결해야 합니다.");
+    });
+  </script>
+</body>
+</html>

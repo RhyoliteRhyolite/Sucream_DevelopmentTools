@@ -1,0 +1,1119 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Visual Novel Prototype</title>
+  <style>
+    :root {
+      --bg: #222321;
+      --panel: rgba(8, 9, 10, 0.82);
+      --panel-soft: rgba(12, 13, 14, 0.58);
+      --line: rgba(238, 232, 218, 0.18);
+      --text: #f3eee5;
+      --muted: #b9b0a0;
+      --gold: #d7b35d;
+      --red: #c75d50;
+      --shadow: 0 24px 80px rgba(0, 0, 0, 0.55);
+      font-family: "Pretendard", "Apple SD Gothic Neo", "Noto Sans KR", system-ui, sans-serif;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      color: var(--text);
+      background: #111;
+      overflow: hidden;
+    }
+
+    button {
+      font: inherit;
+    }
+
+    .vn-shell {
+      position: relative;
+      min-height: 100vh;
+      overflow: hidden;
+      isolation: isolate;
+      background:
+        linear-gradient(180deg, rgba(55, 56, 54, 0.92) 0%, rgba(66, 67, 65, 0.92) 54%, rgba(19, 20, 21, 0.98) 100%),
+        radial-gradient(circle at 50% 26%, rgba(215, 179, 93, 0.08), transparent 36rem),
+        var(--bg);
+    }
+
+    .vn-shell::before {
+      content: "";
+      position: absolute;
+      inset: 0;
+      z-index: 0;
+      background:
+        linear-gradient(90deg, rgba(255, 255, 255, 0.035) 0 1px, transparent 1px 100%),
+        linear-gradient(0deg, rgba(255, 255, 255, 0.025) 0 1px, transparent 1px 100%);
+      background-size: 58px 58px;
+      mask-image: linear-gradient(180deg, rgba(0, 0, 0, 0.5), transparent 64%);
+      pointer-events: none;
+    }
+
+    .stage {
+      position: absolute;
+      inset: 0;
+      z-index: 1;
+      display: grid;
+      place-items: center;
+      padding: 72px 24px 300px;
+    }
+
+    .placeholder-scene {
+      width: min(760px, 72vw);
+      height: min(520px, 54vh);
+      border: 1px solid rgba(238, 232, 218, 0.08);
+      background:
+        radial-gradient(ellipse at 50% 90%, rgba(0, 0, 0, 0.36), transparent 34%),
+        linear-gradient(180deg, rgba(255, 255, 255, 0.035), rgba(255, 255, 255, 0));
+      opacity: 0.34;
+    }
+
+    .menu-toggle {
+      position: absolute;
+      top: 18px;
+      right: 22px;
+      z-index: 6;
+      display: grid;
+      place-items: center;
+      width: 46px;
+      height: 46px;
+      border: 1px solid rgba(238, 232, 218, 0.14);
+      border-radius: 8px;
+      color: var(--text);
+      background: rgba(12, 13, 14, 0.56);
+      box-shadow: var(--shadow);
+      backdrop-filter: blur(14px);
+      cursor: pointer;
+      transition: border-color 160ms ease, background 160ms ease, transform 160ms ease;
+    }
+
+    .menu-toggle:hover,
+    .menu-open .menu-toggle {
+      border-color: rgba(215, 179, 93, 0.42);
+      background: rgba(215, 179, 93, 0.12);
+      transform: translateY(-1px);
+    }
+
+    .menu-toggle span,
+    .menu-toggle::before,
+    .menu-toggle::after {
+      display: none;
+    }
+
+    .menu-toggle svg {
+      width: 24px;
+      height: 24px;
+      display: block;
+    }
+
+    .top-menu {
+      position: absolute;
+      top: 18px;
+      right: 78px;
+      z-index: 6;
+      display: flex;
+      width: auto;
+      gap: 8px;
+      padding: 8px;
+      border: 1px solid rgba(238, 232, 218, 0.12);
+      border-radius: 8px;
+      background: rgba(12, 13, 14, 0.46);
+      box-shadow: var(--shadow);
+      backdrop-filter: blur(14px);
+      opacity: 0;
+      pointer-events: none;
+      transform: translateX(34px);
+      transition: opacity 190ms ease, transform 220ms cubic-bezier(.2, .9, .2, 1);
+    }
+
+    .menu-open .top-menu {
+      opacity: 1;
+      pointer-events: auto;
+      transform: translateX(0);
+    }
+
+    .tool-button {
+      min-width: 68px;
+      min-height: 38px;
+      padding: 0 12px;
+      border: 1px solid transparent;
+      border-radius: 6px;
+      color: var(--muted);
+      background: transparent;
+      cursor: pointer;
+      transition: color 160ms ease, border-color 160ms ease, background 160ms ease, transform 160ms ease;
+    }
+
+    .tool-button:hover,
+    .tool-button.active {
+      color: var(--text);
+      border-color: rgba(215, 179, 93, 0.42);
+      background: rgba(215, 179, 93, 0.11);
+      transform: translateY(-1px);
+    }
+
+    .tool-button.danger.active {
+      border-color: rgba(199, 93, 80, 0.55);
+      background: rgba(199, 93, 80, 0.12);
+    }
+
+    .map-button {
+      position: absolute;
+      top: 76px;
+      right: 22px;
+      z-index: 5;
+      width: 46px;
+      height: 46px;
+      border: 1px solid rgba(238, 232, 218, 0.14);
+      border-radius: 8px;
+      display: grid;
+      place-items: center;
+      color: var(--muted);
+      background: rgba(12, 13, 14, 0.44);
+      box-shadow: var(--shadow);
+      backdrop-filter: blur(14px);
+      cursor: pointer;
+      transition: color 160ms ease, border-color 160ms ease, background 160ms ease, transform 160ms ease, opacity 160ms ease;
+    }
+
+    .map-button:hover {
+      color: var(--text);
+      border-color: rgba(215, 179, 93, 0.42);
+      background: rgba(215, 179, 93, 0.1);
+      transform: translateY(-1px);
+    }
+
+    .map-button svg {
+      width: 23px;
+      height: 23px;
+      display: block;
+    }
+
+    .menu-open .map-button {
+      opacity: 0;
+      pointer-events: none;
+    }
+
+    .dialogue-wrap {
+      position: absolute;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      z-index: 5;
+      padding: 58px clamp(22px, 11vw, 150px) 42px;
+      background:
+        linear-gradient(180deg, transparent 0%, rgba(0, 0, 0, 0.82) 26%, rgba(0, 0, 0, 0.94) 100%);
+      transition: transform 260ms ease, opacity 220ms ease;
+    }
+
+    .ui-hidden .dialogue-wrap,
+    .ui-hidden .choice-layer,
+    .ui-hidden .top-menu,
+    .ui-hidden .menu-toggle,
+    .ui-hidden .map-button {
+      opacity: 0;
+      pointer-events: none;
+    }
+
+    .dialogue-box {
+      max-width: 980px;
+      margin: 0 auto;
+      padding: 0 4px;
+    }
+
+    .speaker-row {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      margin-bottom: 14px;
+    }
+
+    .speaker {
+      min-width: 84px;
+      color: var(--text);
+      font-size: clamp(22px, 2.4vw, 30px);
+      font-weight: 500;
+      letter-spacing: 0;
+    }
+
+    .speaker-line {
+      height: 1px;
+      flex: 1;
+      background: linear-gradient(90deg, rgba(238, 232, 218, 0.34), transparent);
+    }
+
+    .dialogue-text {
+      min-height: 74px;
+      margin: 0;
+      color: var(--text);
+      font-size: clamp(22px, 2.1vw, 28px);
+      line-height: 1.8;
+      letter-spacing: 0;
+      text-shadow: 0 2px 18px rgba(0, 0, 0, 0.64);
+    }
+
+    .advance-mark {
+      position: absolute;
+      right: clamp(22px, 11vw, 150px);
+      bottom: 24px;
+      width: 14px;
+      height: 14px;
+      border-right: 3px solid var(--gold);
+      border-bottom: 3px solid var(--gold);
+      transform: rotate(45deg);
+      animation: pulseDown 900ms ease-in-out infinite;
+    }
+
+    .choice-layer {
+      position: absolute;
+      left: 50%;
+      bottom: 242px;
+      z-index: 7;
+      display: grid;
+      gap: 12px;
+      width: min(760px, calc(100vw - 44px));
+      transform: translateX(-50%);
+    }
+
+    .choice-layer[hidden] {
+      display: none;
+    }
+
+    .choice-panel {
+      border: 1px solid rgba(238, 232, 218, 0.16);
+      border-radius: 8px;
+      background:
+        linear-gradient(135deg, rgba(18, 18, 17, 0.9), rgba(6, 7, 8, 0.84));
+      box-shadow: var(--shadow);
+      backdrop-filter: blur(16px);
+      overflow: hidden;
+      animation: popIn 220ms ease both;
+    }
+
+    .choice-head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 14px;
+      min-height: 44px;
+      padding: 12px 14px;
+      border-bottom: 1px solid rgba(238, 232, 218, 0.12);
+      color: var(--muted);
+      font-size: 13px;
+    }
+
+    .choice-kind {
+      color: var(--gold);
+      font-weight: 800;
+    }
+
+    .choice-timer {
+      height: 5px;
+      overflow: hidden;
+      background: rgba(238, 232, 218, 0.12);
+    }
+
+    .choice-timer-fill {
+      width: 100%;
+      height: 100%;
+      background: linear-gradient(90deg, var(--gold), var(--red));
+      transition-property: width;
+      transition-timing-function: linear;
+    }
+
+    .choice-options {
+      display: grid;
+      gap: 8px;
+      padding: 12px;
+    }
+
+    .choice-button {
+      min-height: 48px;
+      padding: 12px 14px;
+      border: 1px solid rgba(238, 232, 218, 0.12);
+      border-radius: 7px;
+      color: var(--text);
+      background: rgba(255, 255, 255, 0.035);
+      text-align: left;
+      cursor: pointer;
+      transition: border-color 160ms ease, background 160ms ease, transform 160ms ease;
+    }
+
+    .choice-button:hover {
+      border-color: rgba(215, 179, 93, 0.58);
+      background: rgba(215, 179, 93, 0.1);
+      transform: translateX(3px);
+    }
+
+    .choice-button.branch {
+      border-color: rgba(215, 179, 93, 0.28);
+    }
+
+    .choice-button.timed {
+      border-color: rgba(199, 93, 80, 0.28);
+    }
+
+    .choice-impact {
+      display: inline-flex;
+      margin-left: 8px;
+      color: var(--muted);
+      font-size: 12px;
+    }
+
+    .toast {
+      position: absolute;
+      left: 50%;
+      top: 82px;
+      z-index: 10;
+      min-width: 220px;
+      padding: 12px 16px;
+      border: 1px solid rgba(215, 179, 93, 0.28);
+      border-radius: 8px;
+      color: var(--text);
+      background: rgba(10, 11, 12, 0.82);
+      box-shadow: var(--shadow);
+      text-align: center;
+      opacity: 0;
+      transform: translateX(-50%) translateY(-12px);
+      pointer-events: none;
+    }
+
+    .toast.visible {
+      animation: toastIn 1700ms ease both;
+    }
+
+    .modal {
+      position: fixed;
+      inset: 0;
+      z-index: 20;
+      display: none;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+      background: rgba(0, 0, 0, 0.58);
+      backdrop-filter: blur(6px);
+    }
+
+    .modal.open {
+      display: flex;
+      animation: fadeIn 160ms ease both;
+    }
+
+    .modal-card {
+      width: min(760px, 100%);
+      max-height: min(680px, calc(100vh - 40px));
+      overflow: auto;
+      border: 1px solid rgba(238, 232, 218, 0.16);
+      border-radius: 8px;
+      background:
+        linear-gradient(135deg, rgba(26, 25, 23, 0.96), rgba(10, 11, 12, 0.96));
+      box-shadow: var(--shadow);
+      animation: popIn 220ms ease both;
+    }
+
+    .modal-head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+      padding: 18px 20px;
+      border-bottom: 1px solid rgba(238, 232, 218, 0.12);
+    }
+
+    .modal-title {
+      margin: 0;
+      font-size: 20px;
+      font-weight: 700;
+    }
+
+    .close-button {
+      width: 38px;
+      height: 38px;
+      border: 1px solid rgba(238, 232, 218, 0.14);
+      border-radius: 6px;
+      color: var(--muted);
+      background: rgba(255, 255, 255, 0.03);
+      cursor: pointer;
+    }
+
+    .modal-body {
+      padding: 20px;
+    }
+
+    .log-list {
+      display: grid;
+      gap: 14px;
+    }
+
+    .log-entry {
+      padding: 14px 16px;
+      border-left: 2px solid rgba(215, 179, 93, 0.52);
+      background: rgba(255, 255, 255, 0.035);
+      line-height: 1.7;
+    }
+
+    .log-name {
+      margin-bottom: 4px;
+      color: var(--gold);
+      font-weight: 700;
+    }
+
+    .slot-grid {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 12px;
+    }
+
+    .slot {
+      min-height: 112px;
+      padding: 14px;
+      border: 1px solid rgba(238, 232, 218, 0.14);
+      border-radius: 8px;
+      color: var(--text);
+      background: rgba(255, 255, 255, 0.035);
+      text-align: left;
+      cursor: pointer;
+    }
+
+    .slot strong {
+      display: block;
+      margin-bottom: 20px;
+      color: var(--gold);
+    }
+
+    .slot span {
+      color: var(--muted);
+      font-size: 13px;
+      line-height: 1.5;
+    }
+
+    .settings-list {
+      display: grid;
+      gap: 18px;
+    }
+
+    .map-preview {
+      position: relative;
+      min-height: 420px;
+      overflow: hidden;
+      border: 1px solid rgba(238, 232, 218, 0.14);
+      border-radius: 8px;
+      background: #1c1d1b;
+      cursor: grab;
+      touch-action: none;
+    }
+
+    .map-preview.is-panning {
+      cursor: grabbing;
+    }
+
+    .map-preview-world {
+      position: absolute;
+      left: -36%;
+      top: -34%;
+      width: 172%;
+      height: 172%;
+      min-width: 940px;
+      min-height: 680px;
+      transform: translate3d(var(--preview-x, 0px), var(--preview-y, 0px), 0);
+      transition: transform 80ms linear;
+      will-change: transform;
+    }
+
+    .map-preview-bg {
+      position: absolute;
+      inset: 0;
+      background:
+        linear-gradient(135deg, rgba(20, 20, 18, 0.16), rgba(5, 6, 8, 0.38)),
+        url("map-background-landscape.png") center / cover no-repeat,
+        #2d2e2b;
+      filter: sepia(0.2) saturate(0.8) brightness(0.78);
+    }
+
+    .map-preview-bg::after {
+      content: "";
+      position: absolute;
+      inset: 0;
+      background:
+        linear-gradient(90deg, rgba(238, 232, 218, 0.5), transparent 18%, transparent 82%, rgba(238, 232, 218, 0.5)),
+        linear-gradient(0deg, rgba(238, 232, 218, 0.44), transparent 18%, transparent 82%, rgba(238, 232, 218, 0.44)),
+        radial-gradient(circle at center, transparent 0 48%, rgba(0, 0, 0, 0.46) 100%);
+      pointer-events: none;
+    }
+
+    .map-pin-preview {
+      position: absolute;
+      left: var(--x);
+      top: var(--y);
+      z-index: 2;
+      width: 70px;
+      height: 70px;
+      border: 0;
+      border-radius: 50%;
+      color: #111;
+      background: #f3eee5;
+      clip-path: polygon(48% 0%, 58% 5%, 70% 3%, 78% 11%, 90% 14%, 94% 26%, 100% 36%, 96% 49%, 99% 61%, 90% 70%, 87% 84%, 73% 87%, 63% 97%, 50% 94%, 38% 100%, 28% 91%, 15% 88%, 10% 75%, 0% 67%, 5% 54%, 1% 42%, 9% 32%, 12% 18%, 26% 14%, 36% 4%);
+      box-shadow: 0 12px 28px rgba(0, 0, 0, 0.38);
+      transform: translate(-50%, -50%);
+      cursor: default;
+    }
+
+    .map-pin-preview::before {
+      content: attr(data-label);
+      position: absolute;
+      inset: 12px;
+      display: grid;
+      place-items: center;
+      border-radius: 50%;
+      color: #111;
+      background: radial-gradient(circle, rgba(0, 0, 0, 0.18) 0 1px, transparent 1.5px), #f3eee5;
+      background-size: 5px 5px;
+      font-weight: 900;
+    }
+
+    .map-note {
+      margin: 12px 0 0;
+      color: var(--muted);
+      font-size: 13px;
+      line-height: 1.6;
+    }
+
+    .setting-row {
+      display: grid;
+      grid-template-columns: 140px 1fr;
+      gap: 16px;
+      align-items: center;
+    }
+
+    .setting-row label {
+      color: var(--muted);
+    }
+
+    input[type="range"] {
+      width: 100%;
+      accent-color: var(--gold);
+    }
+
+    @keyframes pulseDown {
+      0%, 100% { opacity: 0.35; translate: 0 0; }
+      50% { opacity: 1; translate: 0 5px; }
+    }
+
+    @keyframes toastIn {
+      0% { opacity: 0; transform: translateX(-50%) translateY(-12px); }
+      14%, 78% { opacity: 1; transform: translateX(-50%) translateY(0); }
+      100% { opacity: 0; transform: translateX(-50%) translateY(-8px); }
+    }
+
+    @keyframes fadeIn {
+      from { opacity: 0; }
+      to { opacity: 1; }
+    }
+
+    @keyframes popIn {
+      from { opacity: 0; transform: translateY(16px) scale(0.97); }
+      to { opacity: 1; transform: translateY(0) scale(1); }
+    }
+
+    @media (max-width: 780px) {
+      .menu-toggle {
+        top: 12px;
+        right: 12px;
+      }
+
+      .top-menu {
+        left: 12px;
+        right: 66px;
+        top: 12px;
+        width: auto;
+        display: grid;
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+        transform: translateX(22px);
+      }
+
+      .map-button {
+        top: 68px;
+        right: 12px;
+      }
+
+      .tool-button {
+        min-width: 0;
+        padding: 0 6px;
+        font-size: 13px;
+      }
+
+      .stage {
+        padding-bottom: 300px;
+      }
+
+      .dialogue-wrap {
+        padding: 50px 24px 40px;
+      }
+
+      .choice-layer {
+        bottom: 228px;
+      }
+
+      .advance-mark {
+        right: 28px;
+      }
+
+      .slot-grid {
+        grid-template-columns: 1fr;
+      }
+
+      .setting-row {
+        grid-template-columns: 1fr;
+        gap: 8px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <main class="vn-shell" id="vnShell">
+    <section class="stage" aria-label="비주얼 노벨 무대">
+      <div class="placeholder-scene" aria-hidden="true"></div>
+    </section>
+
+    <button class="menu-toggle" type="button" id="menuToggle" aria-label="기능 메뉴 열기" aria-expanded="false" aria-controls="topMenu">
+      <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
+        <path d="M5 7h14M5 12h14M5 17h14" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/>
+      </svg>
+    </button>
+
+    <button class="map-button" type="button" id="mapButton" aria-label="맵 확인">
+      <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
+        <path d="M8 5l8-2 5 2v14l-5-2-8 2-5-2V3l5 2z" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/>
+        <path d="M8 5v14M16 3v14" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
+      </svg>
+    </button>
+
+    <nav class="top-menu" id="topMenu" aria-label="비주얼 노벨 기능 메뉴">
+      <button class="tool-button" type="button" data-action="log">Log</button>
+      <button class="tool-button" type="button" data-action="auto" aria-pressed="false">Auto</button>
+      <button class="tool-button danger" type="button" data-action="skip" aria-pressed="false">Skip</button>
+      <button class="tool-button" type="button" data-action="hide">Hide</button>
+      <button class="tool-button" type="button" data-action="save">Save</button>
+      <button class="tool-button" type="button" data-action="load">Load</button>
+      <button class="tool-button" type="button" data-action="settings">Settings</button>
+    </nav>
+
+    <section class="dialogue-wrap" id="dialogueWrap" aria-label="대사창">
+      <div class="dialogue-box">
+        <div class="speaker-row">
+          <div class="speaker" id="speaker">시오</div>
+          <div class="speaker-line" aria-hidden="true"></div>
+        </div>
+        <p class="dialogue-text" id="dialogueText">전, 전 괜찮으니까── 의사 선생님까지 올 일은 아닌 것 같아요......</p>
+      </div>
+      <div class="advance-mark" aria-hidden="true"></div>
+    </section>
+
+    <section class="choice-layer" id="choiceLayer" aria-label="대화 선택지" hidden></section>
+
+    <div class="toast" id="toast" role="status" aria-live="polite"></div>
+  </main>
+
+  <div class="modal" id="modal" role="dialog" aria-modal="true" aria-labelledby="modalTitle">
+    <div class="modal-card">
+      <div class="modal-head">
+        <h2 class="modal-title" id="modalTitle">Log</h2>
+        <button class="close-button" type="button" id="modalClose" aria-label="닫기">×</button>
+      </div>
+      <div class="modal-body" id="modalBody"></div>
+    </div>
+  </div>
+
+  <script>
+    const scenario = {
+      start: { type: "line", name: "시오", text: "전, 전 괜찮으니까── 의사 선생님까지 올 일은 아닌 것 같아요......", next: "line-2" },
+      "line-2": { type: "line", name: "시오", text: "조금 어지러웠을 뿐이에요. 정말로요.", next: "choice-general" },
+      "choice-general": {
+        type: "choice",
+        kind: "일반 선택지",
+        description: "스토리 흐름은 크게 바뀌지 않습니다.",
+        choiceClass: "general",
+        options: [
+          { text: "괜찮다면 잠깐만 쉬었다 가자.", result: { name: "시오", text: "......그 정도라면 괜찮아요. 잠깐만이에요." }, next: "line-3" },
+          { text: "무리하지 않아도 돼.", result: { name: "시오", text: "무리하는 건 아니에요. 그냥, 멈추고 싶지 않은 것뿐이에요." }, next: "line-3" }
+        ]
+      },
+      "line-3": { type: "line", name: "???", text: "그 말을 믿기엔 네 얼굴색이 너무 좋지 않아.", next: "choice-branch" },
+      "choice-branch": {
+        type: "choice",
+        kind: "분기 선택지",
+        description: "인물 호감, 방향, 진행에 영향을 줍니다.",
+        choiceClass: "branch",
+        options: [
+          { text: "시오의 결정을 믿는다.", impact: "신뢰 +", result: { name: "시오", text: "고마워요. 그 말, 지금은 정말 필요했어요." }, next: "line-4" },
+          { text: "강하게 말려서 병원으로 데려간다.", impact: "보호 +", result: { name: "시오", text: "......그렇게까지 말한다면, 이번 한 번은 따를게요." }, next: "line-4" }
+        ]
+      },
+      "line-4": { type: "line", name: "시오", text: "하지만 지금 멈추면, 여기까지 온 의미가 없어져요.", next: "choice-timed" },
+      "choice-timed": {
+        type: "choice",
+        kind: "시간 제한 선택지",
+        description: "4초 안에 선택하지 않으면 침묵으로 대답합니다.",
+        choiceClass: "timed",
+        duration: 4000,
+        timeout: { text: "침묵한다.", result: { name: "시오", text: "......아무 말도 안 하는군요. 그럼, 제가 결정할게요." }, next: "ending" },
+        options: [
+          { text: "지금은 네 선택을 듣고 싶어.", impact: "자율 +", result: { name: "시오", text: "제 선택...... 네, 그럼 끝까지 가볼래요." }, next: "ending" },
+          { text: "그래도 지금은 멈춰야 해.", impact: "개입 +", result: { name: "시오", text: "알겠어요. 대신, 이유는 나중에 꼭 설명해 주세요." }, next: "ending" }
+        ]
+      },
+      ending: { type: "line", name: "System", text: "대화 선택지 프로토타입이 종료되었습니다.", next: "start" }
+    };
+
+    let currentNodeId = "start";
+    let pendingNextNodeId = null;
+    let choiceActive = false;
+    let choiceTimer = null;
+    let autoTimer = null;
+    let skipTimer = null;
+    const history = [];
+
+    const shell = document.getElementById("vnShell");
+    const speaker = document.getElementById("speaker");
+    const dialogueText = document.getElementById("dialogueText");
+    const choiceLayer = document.getElementById("choiceLayer");
+    const toast = document.getElementById("toast");
+    const modal = document.getElementById("modal");
+    const modalTitle = document.getElementById("modalTitle");
+    const modalBody = document.getElementById("modalBody");
+    const menuToggle = document.getElementById("menuToggle");
+    const mapButton = document.getElementById("mapButton");
+    const buttons = Array.from(document.querySelectorAll(".tool-button"));
+
+    function addHistory(name, text, meta = "") {
+      history.push({ name, text, meta });
+      if (history.length > 40) history.shift();
+    }
+
+    function setLine(name, text, nextId) {
+      speaker.textContent = name;
+      dialogueText.textContent = text;
+      pendingNextNodeId = nextId;
+      choiceActive = false;
+      choiceLayer.hidden = true;
+      clearTimeout(choiceTimer);
+      addHistory(name, text);
+    }
+
+    function nextLine() {
+      if (choiceActive) return;
+      if (pendingNextNodeId) renderNode(pendingNextNodeId);
+    }
+
+    function renderNode(nodeId) {
+      const node = scenario[nodeId] || scenario.start;
+      currentNodeId = nodeId;
+      if (node.type === "line") {
+        setLine(node.name, node.text, node.next);
+        return;
+      }
+      if (node.type === "choice") {
+        showChoice(node);
+      }
+    }
+
+    function showToast(message) {
+      toast.textContent = message;
+      toast.classList.remove("visible");
+      void toast.offsetWidth;
+      toast.classList.add("visible");
+    }
+
+    function setToggle(action, active) {
+      const button = document.querySelector(`[data-action="${action}"]`);
+      button.classList.toggle("active", active);
+      button.setAttribute("aria-pressed", String(active));
+    }
+
+    function stopAuto() {
+      clearInterval(autoTimer);
+      autoTimer = null;
+      setToggle("auto", false);
+    }
+
+    function stopSkip() {
+      clearInterval(skipTimer);
+      skipTimer = null;
+      setToggle("skip", false);
+    }
+
+    function stopFlowTimers() {
+      stopAuto();
+      stopSkip();
+    }
+
+    function openModal(title, content) {
+      modalTitle.textContent = title;
+      modalBody.innerHTML = content;
+      modal.classList.add("open");
+    }
+
+    function closeModal() {
+      modal.classList.remove("open");
+    }
+
+    function setMenuOpen(open) {
+      shell.classList.toggle("menu-open", open);
+      menuToggle.setAttribute("aria-expanded", String(open));
+      menuToggle.setAttribute("aria-label", open ? "기능 메뉴 닫기" : "기능 메뉴 열기");
+    }
+
+    function showChoice(node) {
+      stopFlowTimers();
+      choiceActive = true;
+      pendingNextNodeId = null;
+      clearTimeout(choiceTimer);
+
+      const timerMarkup = node.duration
+        ? `<div class="choice-timer" aria-hidden="true"><div class="choice-timer-fill" id="choiceTimerFill"></div></div>`
+        : "";
+
+      choiceLayer.innerHTML = `
+        <div class="choice-panel ${node.choiceClass}">
+          <div class="choice-head">
+            <span class="choice-kind">${node.kind}</span>
+            <span>${node.description}</span>
+          </div>
+          ${timerMarkup}
+          <div class="choice-options">
+            ${node.options.map((option, index) => `
+              <button class="choice-button ${node.choiceClass}" type="button" data-choice-index="${index}">
+                ${option.text}
+                ${option.impact ? `<span class="choice-impact">${option.impact}</span>` : ""}
+              </button>
+            `).join("")}
+          </div>
+        </div>
+      `;
+      choiceLayer.hidden = false;
+
+      choiceLayer.querySelectorAll(".choice-button").forEach((button) => {
+        button.addEventListener("click", () => {
+          chooseOption(node, node.options[Number(button.dataset.choiceIndex)], false);
+        });
+      });
+
+      if (node.duration) {
+        const fill = choiceLayer.querySelector("#choiceTimerFill");
+        fill.style.transitionDuration = `${node.duration}ms`;
+        requestAnimationFrame(() => {
+          fill.style.width = "0%";
+        });
+        choiceTimer = setTimeout(() => {
+          chooseOption(node, node.timeout, true);
+        }, node.duration);
+      }
+    }
+
+    function chooseOption(node, option, timedOut) {
+      if (!choiceActive) return;
+      clearTimeout(choiceTimer);
+      choiceActive = false;
+      choiceLayer.hidden = true;
+      addHistory("선택", option.text, timedOut ? "시간 초과" : node.kind);
+      showToast(timedOut ? "침묵으로 대답했습니다." : option.impact || node.kind);
+      setLine(option.result.name, option.result.text, option.next);
+    }
+
+    function renderLog() {
+      const logItems = history.length ? history : [{ name: speaker.textContent, text: dialogueText.textContent }];
+      return `<div class="log-list">${logItems.map((line) => `
+        <article class="log-entry">
+          <div class="log-name">${line.name}${line.meta ? ` · ${line.meta}` : ""}</div>
+          <div>${line.text}</div>
+        </article>
+      `).join("")}</div>`;
+    }
+
+    function renderSlots(mode) {
+      return `<div class="slot-grid">${Array.from({ length: 6 }, (_, index) => `
+        <button class="slot" type="button" data-slot="${index + 1}">
+          <strong>Slot ${index + 1}</strong>
+          <span>${index === 0 ? "시오 / 현재 장면" : "빈 슬롯"}</span>
+        </button>
+      `).join("")}</div>`;
+    }
+
+    function renderSettings() {
+      return `
+        <div class="settings-list">
+          <div class="setting-row">
+            <label for="textSpeed">Text Speed</label>
+            <input id="textSpeed" type="range" min="1" max="10" value="6">
+          </div>
+          <div class="setting-row">
+            <label for="autoSpeed">Auto Speed</label>
+            <input id="autoSpeed" type="range" min="1" max="10" value="5">
+          </div>
+          <div class="setting-row">
+            <label for="volume">Volume</label>
+            <input id="volume" type="range" min="0" max="10" value="7">
+          </div>
+        </div>
+      `;
+    }
+
+    function renderMapPreview() {
+      const pins = [
+        { label: "A", x: "31%", y: "42%" },
+        { label: "B", x: "51%", y: "34%" },
+        { label: "C", x: "68%", y: "49%" },
+        { label: "D", x: "43%", y: "66%" }
+      ];
+      return `
+        <div class="map-preview" aria-label="맵 확인 전용 미리보기">
+          <div class="map-preview-world">
+            <div class="map-preview-bg" aria-hidden="true"></div>
+            ${pins.map((pin) => `<button class="map-pin-preview" type="button" style="--x:${pin.x}; --y:${pin.y}" data-label="${pin.label}" aria-label="${pin.label} 회차 위치 확인 전용" disabled></button>`).join("")}
+          </div>
+        </div>
+        <p class="map-note">현재 화면에서는 회차 위치만 확인할 수 있습니다. 회차 진입은 맵 시스템 화면에서만 가능합니다.</p>
+      `;
+    }
+
+    function wireMapPreviewPan() {
+      const preview = modalBody.querySelector(".map-preview");
+      if (!preview) return;
+      const pan = { x: 0, y: 0, startX: 0, startY: 0, originX: 0, originY: 0, active: false };
+      const clamp = (value, min, max) => Math.min(max, Math.max(min, value));
+
+      function applyPan() {
+        preview.style.setProperty("--preview-x", `${pan.x}px`);
+        preview.style.setProperty("--preview-y", `${pan.y}px`);
+      }
+
+      preview.addEventListener("pointerdown", (event) => {
+        pan.active = true;
+        pan.startX = event.clientX;
+        pan.startY = event.clientY;
+        pan.originX = pan.x;
+        pan.originY = pan.y;
+        preview.classList.add("is-panning");
+        preview.setPointerCapture(event.pointerId);
+      });
+
+      preview.addEventListener("pointermove", (event) => {
+        if (!pan.active) return;
+        pan.x = clamp(pan.originX + event.clientX - pan.startX, -180, 180);
+        pan.y = clamp(pan.originY + event.clientY - pan.startY, -130, 130);
+        applyPan();
+      });
+
+      function endPan(event) {
+        if (!pan.active) return;
+        pan.active = false;
+        preview.classList.remove("is-panning");
+        if (preview.hasPointerCapture(event.pointerId)) preview.releasePointerCapture(event.pointerId);
+      }
+
+      preview.addEventListener("pointerup", endPan);
+      preview.addEventListener("pointercancel", endPan);
+    }
+
+    function handleAction(action) {
+      if (action !== "auto") stopAuto();
+      if (action !== "skip") stopSkip();
+
+      if (action === "log") openModal("Log", renderLog());
+      if (action === "save") openModal("Save", renderSlots("save"));
+      if (action === "load") openModal("Load", renderSlots("load"));
+      if (action === "settings") openModal("Settings", renderSettings());
+
+      if (action === "hide") {
+        setMenuOpen(false);
+        shell.classList.add("ui-hidden");
+        showToast("UI Hidden");
+      }
+
+      if (action === "auto") {
+        if (autoTimer) {
+          stopAuto();
+          showToast("Auto Off");
+        } else {
+          setToggle("auto", true);
+          autoTimer = setInterval(nextLine, 1800);
+          showToast("Auto On");
+        }
+      }
+
+      if (action === "skip") {
+        if (skipTimer) {
+          stopSkip();
+          showToast("Skip Off");
+        } else {
+          setToggle("skip", true);
+          skipTimer = setInterval(nextLine, 360);
+          showToast("Skip On");
+        }
+      }
+
+      if (["log", "save", "load", "settings"].includes(action)) {
+        setMenuOpen(false);
+      }
+    }
+
+    menuToggle.addEventListener("click", (event) => {
+      event.stopPropagation();
+      setMenuOpen(!shell.classList.contains("menu-open"));
+    });
+
+    mapButton.addEventListener("click", (event) => {
+      event.stopPropagation();
+      setMenuOpen(false);
+      openModal("Map", renderMapPreview());
+      wireMapPreviewPan();
+    });
+
+    buttons.forEach((button) => {
+      button.addEventListener("click", () => handleAction(button.dataset.action));
+    });
+
+    document.getElementById("modalClose").addEventListener("click", closeModal);
+    modal.addEventListener("click", (event) => {
+      if (event.target === modal) closeModal();
+    });
+
+    shell.addEventListener("click", (event) => {
+      if (modal.classList.contains("open")) return;
+      if (event.target.closest("button")) return;
+      if (shell.classList.contains("ui-hidden")) {
+        shell.classList.remove("ui-hidden");
+        showToast("UI Restored");
+        return;
+      }
+      if (shell.classList.contains("menu-open")) {
+        setMenuOpen(false);
+        return;
+      }
+      nextLine();
+    });
+
+    window.addEventListener("keydown", (event) => {
+      if (event.key === "Escape") {
+        if (modal.classList.contains("open")) closeModal();
+        else if (shell.classList.contains("menu-open")) setMenuOpen(false);
+        else shell.classList.toggle("ui-hidden");
+      }
+      if (event.key === " " || event.key === "Enter") {
+        if (!modal.classList.contains("open")) nextLine();
+      }
+    });
+
+    renderNode("start");
+  </script>
+</body>
+</html>
